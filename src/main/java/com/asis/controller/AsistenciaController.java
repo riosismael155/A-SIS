@@ -9,6 +9,7 @@ import com.asis.model.dto.ResumenAsistenciasDTO;
 import com.asis.repository.EmpleadoRepository;
 import com.asis.repository.LogCargaAsistenciaRepository;
 import com.asis.repository.RegistroRepository;
+import com.asis.service.EmpleadoService;
 import com.asis.service.ExcelService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
@@ -20,6 +21,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -29,7 +31,9 @@ import java.util.Map;
 public class AsistenciaController {
 
     private final EmpleadoRepository empleadoRepo;
+
     private final RegistroRepository registroRepo;
+    private final EmpleadoService empleadoService;
     private final LogCargaAsistenciaRepository cargaAsistRepo;
     private final ExcelService excelService;
 
@@ -127,21 +131,95 @@ public class AsistenciaController {
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta,
             Model model) {
 
-        // Para cargar la lista de empleados en el select (puedes ajustar esto)
         model.addAttribute("empleados", empleadoRepo.findAll());
 
         if (dni != null && desde != null && hasta != null) {
             Map<String, Object> detalleModel = excelService.generarDetalleEmpleadoView(dni, desde, hasta);
 
-            // Agregamos todo el resultado al modelo de la vista
+            // Agregar todos los atributos al modelo
             model.addAllAttributes(detalleModel);
 
-            // También agregamos la variable para que el select tenga seleccionado el dni correcto
+            // Asegurar valores por defecto para evitar nulls
+            if (!model.containsAttribute("detalle")) {
+                model.addAttribute("detalle", Collections.emptyList());
+            }
+            if (!model.containsAttribute("totalHoras")) {
+                model.addAttribute("totalHoras", 0.0);
+            }
+            if (!model.containsAttribute("totalNormales")) {
+                model.addAttribute("totalNormales", 0.0);
+            }
+            if (!model.containsAttribute("totalExtras")) {
+                model.addAttribute("totalExtras", 0.0);
+            }
+            if (!model.containsAttribute("totalFindeFeriado")) {
+                model.addAttribute("totalFindeFeriado", 0.0);
+            }
+            if (!model.containsAttribute("totalAusencias")) {
+                model.addAttribute("totalAusencias", 0);
+            }
+            if (!model.containsAttribute("totalLlegadasTarde")) {
+                model.addAttribute("totalLlegadasTarde", 0);
+            }
+            if (!model.containsAttribute("diasTrabajados")) {
+                model.addAttribute("diasTrabajados", 0);
+            }
+            if (!model.containsAttribute("minutosTardeTotales")) {
+                model.addAttribute("minutosTardeTotales", 0);
+            }
+
             model.addAttribute("dniSeleccionado", dni);
+            // ✅ Aquí agregamos el booleano
+            boolean esEmpleado = empleadoService.esUsuarioTipoEmpleado(dni);
+            model.addAttribute("esEmpleado", esEmpleado);
+        } else {
+            // Valores por defecto para el formulario
+            if (desde == null) {
+                desde = LocalDate.now().withDayOfMonth(1);
+            }
+            if (hasta == null) {
+                hasta = LocalDate.now();
+            }
+            model.addAttribute("desde", desde);
+            model.addAttribute("hasta", hasta);
         }
 
-        // Devuelve el nombre del template Thymeleaf (por ej. "detalle-asistencia.html")
         return "asistencias/detalle-asistencias";
+    }
+
+    private void asegurarAtributosModelo(Model model, Map<String, Object> detalleModel) {
+        // Lista de atributos que deben estar siempre presentes
+        String[] atributosRequeridos = {
+                "detalle", "empleado", "totalHoras", "totalNormales",
+                "totalExtras", "totalFindeFeriado", "totalAusencias",
+                "totalLlegadasTarde", "diasTrabajados", "minutosTardeTotales"
+        };
+
+        // Asegurar que cada atributo requerido tenga un valor por defecto si no está presente
+        for (String atributo : atributosRequeridos) {
+            if (!detalleModel.containsKey(atributo)) {
+                switch (atributo) {
+                    case "detalle":
+                        model.addAttribute("detalle", Collections.emptyList());
+                        break;
+                    case "empleado":
+                        // No podemos crear un empleado por defecto, pero al menos evitamos null
+                        break;
+                    case "totalHoras":
+                    case "totalNormales":
+                    case "totalExtras":
+                    case "totalFindeFeriado":
+                        model.addAttribute(atributo, 0.0);
+                        break;
+                    case "totalAusencias":
+                    case "totalLlegadasTarde":
+                    case "diasTrabajados":
+                    case "minutosTardeTotales":
+                        model.addAttribute(atributo, 0);
+                        break;
+                }
+            }
+        }
     }
 
     @GetMapping("/editar-horario")
@@ -150,15 +228,15 @@ public class AsistenciaController {
             @RequestParam LocalDate fecha,
             Model model) {
 
-        // Obtenemos el DTO con ambos horarios (principal y secundario)
+        // Obtenemos el DTO con los horarios basados en registros existentes
         EdicionHorarioDTO dto = excelService.prepararEdicionHorario(dni, fecha);
 
-        // Verificamos si el empleado tiene segundo horario configurado
-        boolean tieneSegundoHorario = dto.getHoraEntrada2() != null && dto.getHoraSalida2() != null;
+        // Verificamos si hay registros existentes
+        boolean tieneRegistros = dto.getHoraEntrada1() != null || dto.getHoraEntrada2() != null;
 
         // Agregamos atributos al modelo
         model.addAttribute("edicionDTO", dto);
-        model.addAttribute("tieneSegundoHorario", tieneSegundoHorario);
+        model.addAttribute("tieneRegistros", tieneRegistros);
 
         return "asistencias/editar-horario";
     }

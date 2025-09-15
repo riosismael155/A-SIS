@@ -169,7 +169,6 @@ public class ExcelService {
         int minutosTardeTotales = 0;
         int totalIncompletos = 0;
 
-
         LocalDate actual = desde;
 
         while (!actual.isAfter(hasta)) {
@@ -199,6 +198,14 @@ public class ExcelService {
                     RegistroAsistencia marcaIncompleta = marcasDelDia.get(marcasDelDia.size() - 1);
                     boolean faltaSalida = marcaIncompleta.getOrdenDia() % 2 == 1;
 
+                    // Convertir foto a Base64 para marca incompleta
+                    String fotoBase64 = null;
+                    if (marcaIncompleta.getFoto() != null && marcaIncompleta.getFoto().length > 0) {
+                        fotoBase64 = Base64.getEncoder()
+                                .encodeToString(marcaIncompleta.getFoto())
+                                .replaceAll("\\s+", "");
+                    }
+
                     ResumenEmpleadoDTO dtoIncompleto = new ResumenEmpleadoDTO();
                     dtoIncompleto.setDni(empleado.getDni());
                     dtoIncompleto.setNombreCompleto(empleado.getNombre() + " " + empleado.getApellido());
@@ -214,6 +221,15 @@ public class ExcelService {
                     dtoIncompleto.setEsFeriado(esFeriado);
                     dtoIncompleto.setEsFinDeSemana(esFinDeSemana);
                     dtoIncompleto.setJustificada(false);
+
+                    // Asignar foto según el tipo de marca incompleta
+                    if (faltaSalida) {
+                        dtoIncompleto.setFotoEntradaBase64(fotoBase64);
+                        dtoIncompleto.setFotoSalidaBase64(null);
+                    } else {
+                        dtoIncompleto.setFotoEntradaBase64(null);
+                        dtoIncompleto.setFotoSalidaBase64(fotoBase64);
+                    }
 
                     detalle.add(dtoIncompleto);
                 }
@@ -244,18 +260,19 @@ public class ExcelService {
                     RegistroAsistencia entrada = marcasDelDia.get(i);
                     RegistroAsistencia salida = marcasDelDia.get(i + 1);
 
-                    // CONVERTIR las fotos a Base64
+                    // CONVERTIR fotos a Base64 (entrada/salida)
                     String fotoEntradaBase64 = null;
                     if (entrada.getFoto() != null && entrada.getFoto().length > 0) {
-                        fotoEntradaBase64 = Base64.getEncoder().encodeToString(entrada.getFoto());
+                        fotoEntradaBase64 = Base64.getEncoder()
+                                .encodeToString(entrada.getFoto())
+                                .replaceAll("\\s+", ""); // limpio espacios/saltos
                     }
 
                     String fotoSalidaBase64 = null;
                     if (salida.getFoto() != null && salida.getFoto().length > 0) {
-                        fotoSalidaBase64 = Base64.getEncoder().encodeToString(salida.getFoto());
-                    }
-                    if (entrada.getHora().equals(salida.getHora()) || entrada.getHora().isAfter(salida.getHora())) {
-                        continue;
+                        fotoSalidaBase64 = Base64.getEncoder()
+                                .encodeToString(salida.getFoto())
+                                .replaceAll("\\s+", "");
                     }
 
                     double horas = Duration.between(entrada.getHora(), salida.getHora()).toMinutes() / 60.0;
@@ -366,6 +383,8 @@ public class ExcelService {
                 dto.setMinutosTarde(0);
                 dto.setMarcaIncompleta(false);
                 dto.setSegundoHorario(false);
+                dto.setFotoEntradaBase64(null);
+                dto.setFotoSalidaBase64(null);
 
                 detalle.add(dto);
 
@@ -379,7 +398,6 @@ public class ExcelService {
 
         return detalle;
     }
-
     public Map<String, Object> generarDetalleEmpleadoView(String dni, LocalDate desde, LocalDate hasta) {
         Empleado empleado = empleadoRepo.findByDni(dni).orElseThrow();
         List<RegistroAsistencia> registros = registroRepository.findByEmpleadoDniAndFechaBetween(dni, desde, hasta);
@@ -473,6 +491,8 @@ public class ExcelService {
         resultado.put("diasTrabajados", diasTrabajados);
         resultado.put("minutosTardeTotales", minutosTardeTotales);
         resultado.put("totalAusencias", totalAusencias);
+        resultado.put("detalle", detalle); // Lista<ResumenEmpleadoDTO> con las fotos en Base64
+
 
         return resultado;
     }
@@ -531,10 +551,12 @@ public class ExcelService {
 
     }
 
+
     @Transactional
     public void editarHorariosDia(EdicionHorarioDTO edicionDTO) {
         // Validaciones básicas
-        if (edicionDTO.getHoraEntrada1().isAfter(edicionDTO.getHoraSalida1())) {
+        if (edicionDTO.getHoraEntrada1() != null && edicionDTO.getHoraSalida1() != null &&
+                edicionDTO.getHoraEntrada1().isAfter(edicionDTO.getHoraSalida1())) {
             throw new IllegalArgumentException("La hora de entrada principal no puede ser posterior a la de salida");
         }
 
@@ -551,25 +573,27 @@ public class ExcelService {
                 .findByEmpleadoDniAndFecha(edicionDTO.getDni(), edicionDTO.getFecha());
         registroRepository.deleteAll(registros);
 
-        // Crear registros para el primer horario
-        RegistroAsistencia entrada1 = new RegistroAsistencia();
-        entrada1.setEmpleado(empleado);
-        entrada1.setFecha(edicionDTO.getFecha());
-        entrada1.setHora(edicionDTO.getHoraEntrada1());
-        entrada1.setOrdenDia(1);
-        entrada1.setTipoHora(detectarTipoHora(empleado, edicionDTO.getFecha(), 0));
-        entrada1.setMotivoCambio(edicionDTO.getMotivoCambio());
+        // Crear registros solo para los horarios proporcionados
+        if (edicionDTO.getHoraEntrada1() != null && edicionDTO.getHoraSalida1() != null) {
+            RegistroAsistencia entrada1 = new RegistroAsistencia();
+            entrada1.setEmpleado(empleado);
+            entrada1.setFecha(edicionDTO.getFecha());
+            entrada1.setHora(edicionDTO.getHoraEntrada1());
+            entrada1.setOrdenDia(1);
+            entrada1.setTipoHora(detectarTipoHora(empleado, edicionDTO.getFecha(), 0));
+            entrada1.setMotivoCambio(edicionDTO.getMotivoCambio());
 
-        RegistroAsistencia salida1 = new RegistroAsistencia();
-        salida1.setEmpleado(empleado);
-        salida1.setFecha(edicionDTO.getFecha());
-        salida1.setHora(edicionDTO.getHoraSalida1());
-        salida1.setOrdenDia(2);
-        salida1.setTipoHora(detectarTipoHora(empleado, edicionDTO.getFecha(), 1));
-        salida1.setMotivoCambio(edicionDTO.getMotivoCambio());
+            RegistroAsistencia salida1 = new RegistroAsistencia();
+            salida1.setEmpleado(empleado);
+            salida1.setFecha(edicionDTO.getFecha());
+            salida1.setHora(edicionDTO.getHoraSalida1());
+            salida1.setOrdenDia(2);
+            salida1.setTipoHora(detectarTipoHora(empleado, edicionDTO.getFecha(), 1));
+            salida1.setMotivoCambio(edicionDTO.getMotivoCambio());
 
-        registroRepository.save(entrada1);
-        registroRepository.save(salida1);
+            registroRepository.save(entrada1);
+            registroRepository.save(salida1);
+        }
 
         // Crear registros para el segundo horario (si existe)
         if (edicionDTO.getHoraEntrada2() != null && edicionDTO.getHoraSalida2() != null) {
@@ -593,36 +617,46 @@ public class ExcelService {
             registroRepository.save(salida2);
         }
     }
-
     public EdicionHorarioDTO prepararEdicionHorario(String dni, LocalDate fecha) {
         Empleado empleado = empleadoRepo.findByDni(dni)
                 .orElseThrow(() -> new RuntimeException("Empleado no encontrado"));
 
-        List<RegistroAsistencia> registros = registroRepository.findByEmpleadoDniAndFecha(dni, fecha)
-                .stream()
-                .sorted(Comparator.comparing(RegistroAsistencia::getHora))
-                .toList();
+        // Obtener registros existentes para esa fecha
+        List<RegistroAsistencia> registros = registroRepository
+                .findByEmpleadoDniAndFecha(dni, fecha);
+
+        // Ordenar por orden del día
+        registros = registros.stream()
+                .sorted(Comparator.comparing(RegistroAsistencia::getOrdenDia))
+                .collect(Collectors.toList());
 
         EdicionHorarioDTO dto = new EdicionHorarioDTO();
         dto.setDni(dni);
         dto.setFecha(fecha);
 
-        // Procesar primer horario (entrada1 y salida1)
-        if (registros.size() >= 2) {
-            dto.setHoraEntrada1(registros.get(0).getHora());
-            dto.setHoraSalida1(registros.get(1).getHora());
-        } else {
-            dto.setHoraEntrada1(empleado.getHoraEntrada());
-            dto.setHoraSalida1(empleado.getHoraSalida());
+        // Si no hay registros, devolver DTO vacío
+        if (registros.isEmpty()) {
+            return dto;
         }
 
-        // Procesar segundo horario (entrada2 y salida2)
-        if (registros.size() >= 4) {
-            dto.setHoraEntrada2(registros.get(2).getHora());
-            dto.setHoraSalida2(registros.get(3).getHora());
-        } else if (empleado.getHoraEntrada2() != null && empleado.getHoraSalida2() != null) {
-            dto.setHoraEntrada2(empleado.getHoraEntrada2());
-            dto.setHoraSalida2(empleado.getHoraSalida2());
+        // Procesar registros existentes
+        for (int i = 0; i < registros.size(); i++) {
+            RegistroAsistencia registro = registros.get(i);
+
+            switch (i) {
+                case 0: // Primera entrada
+                    dto.setHoraEntrada1(registro.getHora());
+                    break;
+                case 1: // Primera salida
+                    dto.setHoraSalida1(registro.getHora());
+                    break;
+                case 2: // Segunda entrada (si existe)
+                    dto.setHoraEntrada2(registro.getHora());
+                    break;
+                case 3: // Segunda salida (si existe)
+                    dto.setHoraSalida2(registro.getHora());
+                    break;
+            }
         }
 
         return dto;
