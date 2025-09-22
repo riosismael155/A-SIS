@@ -1,70 +1,150 @@
 <!DOCTYPE html>
 <html lang="es" xmlns:th="http://www.thymeleaf.org">
-<head th:replace="fragments/header :: head('Justificar Ausencias - A-SIS')"><link rel="icon" th:href="@{/favicon.ico}" type="image/x-icon"/></head>
+<head th:replace="fragments/header :: head('Justificar Ausencias - A-SIS')">
+    <link rel="icon" th:href="@{/favicon.ico}" type="image/x-icon"/>
+</head>
 <script th:src="@{/js/busqueda-dinamica.js}"></script>
+<style>
+    /* Pestaña activa con color del botón btn-action */
+    .nav-tabs .nav-link.active {
+        color: var(--bs-success);
+    }
+
+    /* Pestañas inactivas con color text-success de Bootstrap */
+    .nav-tabs .nav-link:not(.active) {
+        color: var(--bs-dark); /* o un tono más oscuro si querés */
+    }
+
+    /* Hover para pestañas inactivas (opcional) */
+    .nav-tabs .nav-link:not(.active):hover {
+        color: var(--bs-success);    }
+</style>
+
 
 <body>
+
 <div th:replace="fragments/header :: body"></div>
 <main class="flex-fill">
-    <div class="container">
-        <div class="bloque-elevado px-5 py-4 mt-container">
+    <div class="container mt-4">
 
-            <div class="d-flex align-items-center mb-4">
-                <a href="javascript:history.back()"
-                   class="me-3 color-iconos d-flex align-items-center"
-                   title="Volver atrás">
-                    <i class="bi bi-arrow-left-circle me-1 fs-5"></i>
-                </a>
-                <i class="bi bi-file-earmark-check fs-5 me-2 color-iconos"></i>
-                <h4 class="mb-0 text-h">Justificación de Ausencias</h4>
-            </div>
+        <div class="bloque-elevado px-4 py-4">
 
+            <!-- Pestañas -->
+            <ul class="nav nav-tabs mb-4" id="justificacionesTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="justificar-tab" data-bs-toggle="tab" data-bs-target="#justificar"
+                            type="button" role="tab" aria-controls="justificar" aria-selected="true">
+                        Justificar ausencia
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="listado-tab" data-bs-toggle="tab" data-bs-target="#listado"
+                            type="button" role="tab" aria-controls="listado" aria-selected="false">
+                        Listado de justificaciones
+                    </button>
+                </li>
+            </ul>
 
+            <!-- Contenido de las pestañas -->
+            <div class="tab-content" id="justificacionesTabsContent">
 
-            <!-- Formulario para justificar ausencia -->
-            <form th:action="@{/justificaciones/guardar}" method="post" class="row g-3 mb-4">
-                <div class="col-md-4">
-                    <!-- BLOQUE 1: Autocompletado -->
-                    <div class="form-group d-flex flex-column position-relative flex-grow-1" style="min-width: 250px;">
-                        <label for="empleado" class="form-label">Empleado</label>
-                        <input type="text" id="empleado" name="empleado" class="form-control"
-                               placeholder="Buscar por apellido, nombre o DNI" autocomplete="off">
-                        <input type="hidden" id="dni" name="dni">
-                        <div id="sugerencias" class="list-group position-absolute w-100 z-3"
-                             style="top: 100%; max-height: 200px; overflow-y: auto;"></div>
+                <!-- Pestaña 1: Formulario -->
+                <div class="tab-pane fade show active" id="justificar" role="tabpanel" aria-labelledby="justificar-tab">
+                    <form th:action="@{/justificaciones/guardar}" method="post" class="row g-3">
+                        <div class="col-md-4">
+                            <div class="form-group d-flex flex-column position-relative flex-grow-1" style="min-width: 250px;">
+                                <label for="empleado" class="form-label">Empleado</label>
+                                <input type="text" id="empleado" name="empleado" class="form-control"
+                                       placeholder="Buscar por apellido, nombre o DNI" autocomplete="off">
+                                <input type="hidden" id="dni" name="dni">
+                                <div id="sugerencias" class="list-group position-absolute w-100 z-3"
+                                     style="top: 100%; max-height: 200px; overflow-y: auto;"></div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label for="desde" class="form-label">Desde</label>
+                            <input type="date" class="form-control" id="desde" name="desde" required>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label for="hasta" class="form-label">Hasta</label>
+                            <input type="date" class="form-control" id="hasta" name="hasta">
+                            <div class="form-text">Podés dejarlo vacío si es un solo día.</div>
+                        </div>
+
+                        <!-- Nueva fila: tipo, descripción y botón -->
+                        <div class="col">
+                            <label for="tipoAusencia" class="form-label">Tipo de ausencia</label>
+                            <select id="tipoAusencia" name="tipoAusencia" class="form-select" required>
+                                <option value="" disabled selected>Seleccione un tipo</option>
+                                <option th:each="tipo : ${tiposAusencia}"
+                                        th:value="${tipo.name()}"
+                                        th:text="${tipo}"></option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-7">
+                            <label for="descripcion" class="form-label">Descripción</label>
+                            <input type="text" class="form-control" id="descripcion" name="descripcion" required>
+                        </div>
+
+                        <div class="col d-flex align-items-end justify-content-end">
+                            <button type="submit" class="btn-action w-100">
+                                <i class="bi bi-check-circle me-1"></i> Justificar ausencia
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Pestaña 2: Listado -->
+                <div class="tab-pane fade" id="listado" role="tabpanel" aria-labelledby="listado-tab">
+                    <div class="table-responsive mt-3">
+                        <table class="table table-striped table-hover align-middle">
+                            <thead class="table-light">
+                            <tr>
+                                <th>Empleado</th>
+                                <th>Desde</th>
+                                <th>Hasta</th>
+                                <th>Tipo</th>
+                                <th>Descripción</th>
+                                <th>Acciones</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="justificacion : ${justificaciones}">
+                                <td th:text="${justificacion.empleado.nombre + ' ' + justificacion.empleado.apellido}"></td>
+                                <td th:text="${#temporals.format(justificacion.desde, 'dd/MM/yyyy')}"></td>
+                                <td th:text="${#temporals.format(justificacion.hasta, 'dd/MM/yyyy')}"></td>
+
+                                <td th:text="${justificacion.tipoDeAusencia.descripcion}"></td>
+                                <td th:text="${justificacion.descripcion}"></td>
+                                <td>
+                                    <form th:action="@{/justificaciones/eliminar/{id}(id=${justificacion.id})}" method="post"
+                                          onsubmit="return confirm('¿Seguro que querés eliminar esta justificación?');">
+
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                                            <i class="bi bi-trash"></i> Eliminar
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            <tr th:if="${#lists.isEmpty(justificaciones)}">
+                                <td colspan="6" class="text-center">No hay justificaciones registradas.</td>
+                            </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 
-                <div class="col-md-4">
-                    <label for="desde" class="form-label">Desde</label>
-                    <input type="date" class="form-control" id="desde" name="desde" required>
-                </div>
-
-                <div class="col-md-4">
-                    <label for="hasta" class="form-label">Hasta</label>
-                    <input type="date" class="form-control" id="hasta" name="hasta">
-                    <div class="form-text">Podés dejarlo vacío si es un solo día.</div>
-                </div>
-
-                <div class="col-md-12">
-                    <label for="descripcion" class="form-label">Descripción</label>
-                    <input type="text" class="form-control" id="descripcion" name="descripcion" required>
-                </div>
-
-                <div class="col-12 d-flex justify-content-end">
-                    <button type="submit" class="btn-action">
-                        <i class="bi bi-check-circle me-1"></i> Justificar ausencia
-                    </button>
-                </div>
-            </form>
-
-            <!-- Aquí podríamos poner la lista de justificaciones más adelante -->
-            <!-- Por ejemplo: empleado, fechas justificadas, descripción, acciones -->
-
-        </div>
-    </div>
+            </div> <!-- tab-content -->
+        </div> <!-- bloque-elevado -->
+    </div> <!-- container -->
 </main>
 
 <div th:replace="fragments/footer :: footer"></div>
+
+<!-- Bootstrap JS (necesario para pestañas) -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

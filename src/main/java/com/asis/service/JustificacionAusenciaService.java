@@ -1,7 +1,7 @@
 package com.asis.service;
 
 import com.asis.model.Empleado;
-import com.asis.model.JustificacionAusencia;
+import com.asis.model.Ausencia;
 import com.asis.model.RegistroAsistencia;
 import com.asis.repository.EmpleadoRepository;
 import com.asis.repository.JustificacionAusenciaRepository;
@@ -25,11 +25,19 @@ public class JustificacionAusenciaService {
     private final FeriadoService feriadoService;
 
     @Transactional
-    public void justificarAusencia(String dni, LocalDate desde, LocalDate hasta, String descripcion) {
+    public void justificarAusencia(String dni, LocalDate desde, LocalDate hasta, String descripcion, Ausencia.TipoDeAusencia tipoAusencia) {
         Empleado empleado = empleadoRepo.findByDni(dni)
                 .orElseThrow(() -> new IllegalArgumentException("Empleado no encontrado con DNI: " + dni));
 
-        List<RegistroAsistencia> registros = new ArrayList<>();
+        // Crear la justificación
+        Ausencia justificacion = Ausencia.builder()
+                .empleado(empleado)
+                .desde(desde)
+                .hasta(hasta)
+                .descripcion(descripcion)
+                .tipoDeAusencia(tipoAusencia)
+                .build();
+
         LocalDate actual = desde;
 
         while (!actual.isAfter(hasta)) {
@@ -37,47 +45,67 @@ public class JustificacionAusenciaService {
             boolean esFeriado = feriadoService.esFeriado(actual);
             boolean esLaboral = !esFinde && !esFeriado;
 
-            boolean tieneMarcas = registroRepo.existsByEmpleadoAndFecha(empleado, actual);
+            // Solo generar registros si es día laboral
+            boolean generarRegistros = esLaboral;
 
-            if (esLaboral && !tieneMarcas) {
-                RegistroAsistencia entrada = new RegistroAsistencia();
-                entrada.setEmpleado(empleado);
-                entrada.setFecha(actual);
-                entrada.setHora(empleado.getHoraEntrada());
-                entrada.setOrdenDia(1);
-                entrada.setTipoHora(RegistroAsistencia.TipoHora.NORMAL);
+            if (generarRegistros) {
+                // Verificar si ya existen registros para este empleado y fecha
+                List<RegistroAsistencia> existentes = registroRepo.findByEmpleadoAndFecha(empleado, actual);
+                if (existentes.isEmpty()) {
+                    // Crear registro de entrada
+                    RegistroAsistencia entrada = new RegistroAsistencia();
+                    entrada.setEmpleado(empleado);
+                    entrada.setFecha(actual);
+                    entrada.setHora(empleado.getHoraEntrada());
+                    entrada.setOrdenDia(1);
+                    entrada.setTipoHora(RegistroAsistencia.TipoHora.NORMAL);
+                    entrada.setJustificacion(justificacion);
 
-                RegistroAsistencia salida = new RegistroAsistencia();
-                salida.setEmpleado(empleado);
-                salida.setFecha(actual);
-                salida.setHora(empleado.getHoraSalida());
-                salida.setOrdenDia(2);
-                salida.setTipoHora(RegistroAsistencia.TipoHora.NORMAL);
+                    // Crear registro de salida
+                    RegistroAsistencia salida = new RegistroAsistencia();
+                    salida.setEmpleado(empleado);
+                    salida.setFecha(actual);
+                    salida.setHora(empleado.getHoraSalida());
+                    salida.setOrdenDia(2);
+                    salida.setTipoHora(RegistroAsistencia.TipoHora.NORMAL);
+                    salida.setJustificacion(justificacion);
 
-                registros.add(entrada);
-                registros.add(salida);
+                    // Añadir al padre (bidireccionalidad)
+                    justificacion.getRegistrosGenerados().add(entrada);
+                    justificacion.getRegistrosGenerados().add(salida);
+                } else {
+                    // Actualizar registros existentes para que apunten a la justificación
+                    for (RegistroAsistencia r : existentes) {
+                        r.setJustificacion(justificacion);
+                        justificacion.getRegistrosGenerados().add(r);
+                    }
+                }
             }
 
             actual = actual.plusDays(1);
         }
 
-        JustificacionAusencia justificacion = JustificacionAusencia.builder()
-                .empleado(empleado)
-                .desde(desde)
-                .hasta(hasta)
-                .descripcion(descripcion)
-                .registrosGenerados(registros)
-                .build();
-
-        // Asignar la justificación a cada registro generado
-        registros.forEach(r -> r.setJustificacion(justificacion));
-
+        // Guardar la justificación, se persisten los registros por cascade
         justificacionRepo.save(justificacion);
     }
 
-    public boolean existeJustificacionPara(Empleado empleado, LocalDate fecha) {
-        return justificacionRepo.existsByEmpleadoAndDesdeLessThanEqualAndHastaGreaterThanEqual(empleado, fecha, fecha);
+
+    public List<Ausencia> listarJustificaciones() {
+        return justificacionRepo.findAll();
     }
 
+
+
+    @Transactional
+    public void eliminarJustificacion(Long id) {
+        if (!justificacionRepo.existsById(id)) {
+            throw new IllegalArgumentException("No existe la justificación con id: " + id);
+        }
+        justificacionRepo.deleteById(id);
+    }
+
+    public Ausencia obtenerAusenciaEmpleadoEnFecha(Empleado empleado, LocalDate fecha) {
+        return justificacionRepo.findByEmpleadoAndFecha(empleado, fecha).orElse(null);
+    }
 
 }

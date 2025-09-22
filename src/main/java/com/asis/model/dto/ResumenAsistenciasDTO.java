@@ -19,6 +19,7 @@ public class ResumenAsistenciasDTO {
     private long totalAusencias;
     private long totalLlegadasTarde;
     private Empleado.TipoContrato tipoContrato;
+    boolean presentismo;
 }
 
 

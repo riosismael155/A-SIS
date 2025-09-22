@@ -42,10 +42,10 @@ public class AsistenciaController {
         LocalDate hoy = LocalDate.now();
 
         // Desde: 15 del mes pasado
-        LocalDate desde = hoy.minusMonths(1).withDayOfMonth(15);
+        LocalDate desde = hoy.minusMonths(1).withDayOfMonth(21);
 
         // Hasta: 7 del mes actual
-        LocalDate hasta = hoy.withDayOfMonth(7);
+        LocalDate hasta = hoy.withDayOfMonth(20);
 
         model.addAttribute("desde", desde);
         model.addAttribute("hasta", hasta);
@@ -173,12 +173,20 @@ public class AsistenciaController {
             boolean esEmpleado = empleadoService.esUsuarioTipoEmpleado(dni);
             model.addAttribute("esEmpleado", esEmpleado);
         } else {
-            // Valores por defecto para el formulario
+            LocalDate hoy = LocalDate.now();
+
             if (desde == null) {
-                desde = LocalDate.now().withDayOfMonth(1);
+                // 21 del mes anterior
+                desde = hoy.minusMonths(1).withDayOfMonth(21);
             }
             if (hasta == null) {
-                hasta = LocalDate.now();
+                // 20 del mes actual
+                hasta = hoy.withDayOfMonth(20);
+
+                // Si hoy es antes del 20, usar 20 del mes anterior
+                if (hoy.getDayOfMonth() < 20) {
+                    hasta = hoy.minusMonths(1).withDayOfMonth(20);
+                }
             }
             model.addAttribute("desde", desde);
             model.addAttribute("hasta", hasta);

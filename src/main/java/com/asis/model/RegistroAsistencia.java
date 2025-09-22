@@ -31,8 +31,8 @@ public class RegistroAsistencia {
     private TipoHora tipoHora;
 
     @ManyToOne
-    @JoinColumn(name = "justificacion_id")
-    private JustificacionAusencia justificacion;
+    @JoinColumn(name = "ausencia_id")
+    private Ausencia justificacion;
 
     private String motivoCambio;
 

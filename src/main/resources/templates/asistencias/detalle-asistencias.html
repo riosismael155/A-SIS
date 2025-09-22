@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="es" xmlns:th="http://www.thymeleaf.org">
-<head th:replace="fragments/header :: head('Detalle Individual - A-SIS')">
-    <link rel="icon" th:href="@{/favicon.ico}" type="image/x-icon"/>
+<head th:replace="fragments/header :: head(${empleado != null} ? ${empleado.apellido + ' ' + empleado.nombre} : 'Detalle Individual de Asistencia')">
 </head>
 <script th:src="@{/js/busqueda-dinamica.js}"></script>
 
@@ -70,12 +69,16 @@
                         <li><strong>Horas fin de semana y feriados:</strong>
                             <span th:text="${#numbers.formatDecimal(totalFindeFeriado ?: 0.0, 1, 1) + ' h'}"></span>
                         </li>
-                        <li><strong>Ausencias:</strong>
-                            <span th:text="${totalAusencias ?: 0}"></span></li>
+
                         <li><strong>Llegadas tarde:</strong>
                             <span th:text="${totalLlegadasTarde ?: 0}"></span></li>
                         <li><strong>Días trabajados:</strong>
                             <span th:text="${diasTrabajados ?: 0}"></span></li>
+                        <li><strong>Presentismo:</strong>
+                            <span th:text="${presentismoEmpleado} ? 'Sí' : 'No'"></span>
+                        </li>
+                        <li><strong>Ausencias Injustificadas:</strong>
+                            <span th:text="${totalAusencias ?: 0}"></span></li>
                     </ul>
                 </div>
 
@@ -93,22 +96,26 @@
                         <th>Llegada tarde</th>
                         <th th:if="${esEmpleado}">Foto entrada</th>
                         <th th:if="${esEmpleado}">Foto salida</th>
+                        <th>Ausencia</th>
                     </tr>
                     </thead>
                     <tbody>
                     <tr th:each="d, iterStat : ${detalle}"
                         th:with="
-                            esPrimeraFilaDelDia=${iterStat.index == 0 or d.fechaFormateada != detalle[iterStat.index - 1].fechaFormateada},
-                            rowClass=${d.ausente ? 'ausente' :
-                                     (d.marcaIncompleta ? 'incompleto' :
-                                     (d.esFeriado ? 'feriado' :
-                                     (d.esFinDeSemana ? 'finde' : 'normal')))}"
+        esPrimeraFilaDelDia=${iterStat.index == 0 or d.fechaFormateada != detalle[iterStat.index - 1].fechaFormateada},
+        rowClass=${d.ausente ? (d.tipoDeAusencia == 'VACACIONES' ? 'vacaciones' :
+                    (d.tipoDeAusencia == 'JUSTIFICADA' ? 'justificada' : 'injustificada')) :
+                    (d.marcaIncompleta ? 'incompleto' :
+                    (d.esFeriado ? 'feriado' :
+                    (d.esFinDeSemana ? 'finde' : 'normal')))}
+    "
                         th:class="${rowClass} + ' clickable-row'"
                         th:data-dni="${d.dni}"
                         th:data-fecha="${d.fechaFormateada != null ? #strings.substring(d.fechaFormateada, 6, 10) + '-' + #strings.substring(d.fechaFormateada, 3, 5) + '-' + #strings.substring(d.fechaFormateada, 0, 2) : ''}"
                         onclick="handleRowClick(this)"
                         style="cursor: pointer;"
                         role="button">
+
 
                         <!-- Fecha (solo en la primera fila del día) -->
                         <td th:text="${esPrimeraFilaDelDia} ? ${d.fechaFormateada} : ''"></td>
@@ -141,7 +148,7 @@
                                     <span th:case="'NORMAL'" class="badge bg-primary">Normal</span>
                                     <span th:case="'EXTRA'" class="badge bg-danger">Extra</span>
                                     <span th:case="'MIXTO'" class="badge bg-warning text-dark">Mixto</span>
-                                    <span th:case="'FIN_SEMANA'" class="badge bg-secondary">Finde</span>
+                                    <span th:case="'FIN_SEMANA'" class="badge bg-secondary">Finde/Feriado</span>
                                     <span th:case="'FERIADO'" class="badge bg-dark">Feriado</span>
                                     <span th:case="*" class="badge bg-light text-dark">-</span>
                                 </span>
@@ -154,7 +161,7 @@
                         <!-- Llegada tarde -->
                         <td>
                             <span th:if="${d.llegoTarde}"
-                                <span th:text="${d.minutosTarde} + ' min'"></span>
+                            <span th:text="${d.minutosTarde} + ' min'"></span>
                             </span>
                             <span th:if="${!d.llegoTarde}">-</span>
                         </td>
@@ -180,6 +187,10 @@
                                  class="img-thumbnail"/>
                             <span th:if="${d.fotoSalidaBase64 == null or d.fotoSalidaBase64 == ''}">-</span>
                         </td>
+
+                        <!-- Columna Ausencia -->
+                        <td th:text="${d.ausente} ? ${d.tipoDeAusencia != null ? d.tipoDeAusencia.name() : '-'} : '-'"></td>
+
 
                     </tr>
                     </tbody>

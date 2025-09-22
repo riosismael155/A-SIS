@@ -56,7 +56,6 @@ public class DataLoader {
                 return savedUser;
             });
 
-            System.out.println("Carga inicial de datos completada");
         };
     }
 }

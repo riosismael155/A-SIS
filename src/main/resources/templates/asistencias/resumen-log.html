@@ -1,9 +1,24 @@
 <!DOCTYPE html>
 <html lang="es" xmlns:th="http://www.thymeleaf.org">
-<head th:replace="fragments/header :: head('Resumen por Log - A-SIS')">
+<head th:replace="fragments/header :: head('PLANILLA MENSUAL - A-SIS')">
     <link rel="icon" th:href="@{/favicon.ico}" type="image/x-icon"/>
 </head>
 <body>
+
+<style>.table-responsive {
+    max-height: 400px; /* Ajusta según necesites */
+    overflow-y: auto;
+}
+
+.table-responsive thead th {
+    position: sticky;
+    top: 0;
+    background-color: #343a40; /* mismo color de table-dark */
+    color: #fff;
+    z-index: 10;
+}
+</style>
+
 
 <div th:replace="fragments/header :: body"></div>
 <main class="flex-fill">
@@ -75,13 +90,13 @@
                         <th>DNI</th>
                         <th>Apellido</th>
                         <th>Nombre</th>
-                        <th>Tipo Contrato</th>
                         <th>Total Horas</th>
                         <th>Normales</th>
                         <th>Extras</th>
                         <th>Finde/Feriado</th>
-                        <th>Ausencias</th>
-                        <th>Llegadas Tarde</th>
+                        <th>Presentismo</th>
+                        <th>Ausencias Injustificadas</th>
+
                     </tr>
                     </thead>
                     <tbody>
@@ -92,13 +107,15 @@
                         <td th:text="${e.dni}"></td>
                         <td th:text="${e.apellido}"></td>
                         <td th:text="${e.nombre}"></td>
-                        <td th:text="${e.tipoContrato}"></td>
                         <td th:text="${#numbers.formatDecimal(e.totalHoras, 1, 1)}"></td>
                         <td th:text="${#numbers.formatDecimal(e.totalNormales, 1, 1)}"></td>
                         <td th:text="${#numbers.formatDecimal(e.totalExtras, 1, 1)}"></td>
                         <td th:text="${#numbers.formatDecimal(e.totalFinde, 1, 1)}"></td>
+                        <td th:text="${e.presentismo ? 'Sí' : 'No'}"></td>
                         <td th:text="${e.totalAusencias}"></td>
-                        <td th:text="${e.totalLlegadasTarde}"></td>
+
+
+
                     </tr>
                     </tbody>
                 </table>

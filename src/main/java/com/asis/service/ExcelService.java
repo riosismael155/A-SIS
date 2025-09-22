@@ -1,9 +1,6 @@
 package com.asis.service;
 
-import com.asis.model.Empleado;
-import com.asis.model.LogCargaAsistencia;
-import com.asis.model.Marca;
-import com.asis.model.RegistroAsistencia;
+import com.asis.model.*;
 import com.asis.model.dto.CargaAsistenciaDTO;
 import com.asis.model.dto.EdicionHorarioDTO;
 import com.asis.model.dto.ResumenAsistenciasDTO;
@@ -22,6 +19,7 @@ import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.time.format.TextStyle;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 @Service
@@ -30,7 +28,7 @@ public class ExcelService {
 
     private final EmpleadoRepository empleadoRepo;
     private final RegistroRepository registroRepository;
-
+    private final JustificacionAusenciaService ausenciaService;
     private final LogCargaAsistenciaRepository logCargaRepository;
     private final FeriadoService feriadoService;
 
@@ -150,7 +148,12 @@ public class ExcelService {
     }
 
 
-    public List<ResumenEmpleadoDTO> procesarAsistenciasEmpleado(Empleado empleado, List<RegistroAsistencia> registros, LocalDate desde, LocalDate hasta) {
+    public List<ResumenEmpleadoDTO> procesarAsistenciasEmpleado(
+            Empleado empleado,
+            List<RegistroAsistencia> registros,
+            LocalDate desde,
+            LocalDate hasta) {
+
         Map<LocalDate, List<RegistroAsistencia>> registrosPorDia = registros.stream()
                 .sorted(Comparator.comparing(RegistroAsistencia::getHora))
                 .collect(Collectors.groupingBy(RegistroAsistencia::getFecha));
@@ -175,7 +178,9 @@ public class ExcelService {
             String nombreDia = actual.getDayOfWeek().getDisplayName(TextStyle.FULL, localeEs);
             String fechaFormateada = actual.format(formatoLatino);
 
-            List<RegistroAsistencia> marcasDelDia = registrosPorDia.getOrDefault(actual, List.of()).stream()
+            List<RegistroAsistencia> marcasDelDia = registrosPorDia
+                    .getOrDefault(actual, List.of())
+                    .stream()
                     .sorted(Comparator.comparing(RegistroAsistencia::getHora))
                     .toList();
 
@@ -183,221 +188,223 @@ public class ExcelService {
             boolean esFinDeSemana = actual.getDayOfWeek() == DayOfWeek.SATURDAY || actual.getDayOfWeek() == DayOfWeek.SUNDAY;
             boolean esLaboral = !esFeriado && !esFinDeSemana;
 
-            double horasJustificadasDia = 0;
-            double horasRealesDia = 0;
             boolean tieneHorasJustificadas = false;
             boolean tieneHorasReales = false;
             boolean esPrimeraMarca = true;
             boolean tieneMarcasIncompletas = false;
 
-            if (!marcasDelDia.isEmpty()) {
-                if (marcasDelDia.size() % 2 != 0) {
-                    totalIncompletos++;
-                    tieneMarcasIncompletas = true;
+            // ---------- Manejo de marcas incompletas ----------
+            if (!marcasDelDia.isEmpty() && marcasDelDia.size() % 2 != 0) {
+                totalIncompletos++;
+                tieneMarcasIncompletas = true;
+                RegistroAsistencia marcaIncompleta = marcasDelDia.get(marcasDelDia.size() - 1);
+                boolean faltaSalida = marcaIncompleta.getOrdenDia() % 2 == 1;
 
-                    RegistroAsistencia marcaIncompleta = marcasDelDia.get(marcasDelDia.size() - 1);
-                    boolean faltaSalida = marcaIncompleta.getOrdenDia() % 2 == 1;
-
-                    // Convertir foto a Base64 para marca incompleta
-                    String fotoBase64 = null;
-                    if (marcaIncompleta.getFoto() != null && marcaIncompleta.getFoto().length > 0) {
-                        fotoBase64 = Base64.getEncoder()
-                                .encodeToString(marcaIncompleta.getFoto())
-                                .replaceAll("\\s+", "");
-                    }
-
-                    ResumenEmpleadoDTO dtoIncompleto = new ResumenEmpleadoDTO();
-                    dtoIncompleto.setDni(empleado.getDni());
-                    dtoIncompleto.setNombreCompleto(empleado.getNombre() + " " + empleado.getApellido());
-                    dtoIncompleto.setFechaFormateada(fechaFormateada);
-                    dtoIncompleto.setNombreDia(nombreDia);
-                    dtoIncompleto.setMarcaIncompleta(true);
-                    dtoIncompleto.setTipoIncompleto(faltaSalida ? "FALTA_SALIDA" : "FALTA_ENTRADA");
-                    dtoIncompleto.setHoraEntrada(faltaSalida ? marcaIncompleta.getHora() : null);
-                    dtoIncompleto.setHoraSalida(faltaSalida ? null : marcaIncompleta.getHora());
-                    dtoIncompleto.setTipoHora("INCOMPLETO");
-                    dtoIncompleto.setHorasTrabajadas(0);
-                    dtoIncompleto.setAusente(false);
-                    dtoIncompleto.setEsFeriado(esFeriado);
-                    dtoIncompleto.setEsFinDeSemana(esFinDeSemana);
-                    dtoIncompleto.setJustificada(false);
-
-                    // Asignar foto según el tipo de marca incompleta
-                    if (faltaSalida) {
-                        dtoIncompleto.setFotoEntradaBase64(fotoBase64);
-                        dtoIncompleto.setFotoSalidaBase64(null);
-                    } else {
-                        dtoIncompleto.setFotoEntradaBase64(null);
-                        dtoIncompleto.setFotoSalidaBase64(fotoBase64);
-                    }
-
-                    detalle.add(dtoIncompleto);
+                String fotoBase64 = null;
+                if (marcaIncompleta.getFoto() != null && marcaIncompleta.getFoto().length > 0) {
+                    fotoBase64 = Base64.getEncoder().encodeToString(marcaIncompleta.getFoto()).replaceAll("\\s+", "");
                 }
 
-                // Determinar horario activo (primer o segundo)
-                LocalTime horaEntradaActiva = empleado.getHoraEntrada();
-                LocalTime horaSalidaActiva = empleado.getHoraSalida();
-                boolean esSegundoHorario = false;
+                ResumenEmpleadoDTO dtoIncompleto = new ResumenEmpleadoDTO();
+                dtoIncompleto.setDni(empleado.getDni());
+                dtoIncompleto.setNombreCompleto(empleado.getNombre() + " " + empleado.getApellido());
+                dtoIncompleto.setFechaFormateada(fechaFormateada);
+                dtoIncompleto.setNombreDia(nombreDia);
+                dtoIncompleto.setMarcaIncompleta(true);
+                dtoIncompleto.setTipoIncompleto(faltaSalida ? "FALTA_SALIDA" : "FALTA_ENTRADA");
+                dtoIncompleto.setHoraEntrada(faltaSalida ? marcaIncompleta.getHora() : null);
+                dtoIncompleto.setHoraSalida(faltaSalida ? null : marcaIncompleta.getHora());
+                dtoIncompleto.setTipoHora("INCOMPLETO");
+                dtoIncompleto.setHorasTrabajadas(0);
+                dtoIncompleto.setAusente(false);
+                dtoIncompleto.setEsFeriado(esFeriado);
+                dtoIncompleto.setEsFinDeSemana(esFinDeSemana);
+                dtoIncompleto.setJustificada(false);
 
-                if (empleado.getHoraEntrada2() != null && empleado.getHoraSalida2() != null) {
-                    RegistroAsistencia primeraEntrada = marcasDelDia.get(0);
-                    long diffHorario1 = Math.abs(Duration.between(primeraEntrada.getHora(), empleado.getHoraEntrada()).toMinutes());
-                    long diffHorario2 = Math.abs(Duration.between(primeraEntrada.getHora(), empleado.getHoraEntrada2()).toMinutes());
-                    if (diffHorario2 < diffHorario1) {
-                        horaEntradaActiva = empleado.getHoraEntrada2();
-                        horaSalidaActiva = empleado.getHoraSalida2();
-                        esSegundoHorario = true;
-                    }
+                if (faltaSalida) {
+                    dtoIncompleto.setFotoEntradaBase64(fotoBase64);
+                    dtoIncompleto.setFotoSalidaBase64(null);
+                } else {
+                    dtoIncompleto.setFotoEntradaBase64(null);
+                    dtoIncompleto.setFotoSalidaBase64(fotoBase64);
                 }
 
-                int flexMinutos = Optional.ofNullable(empleado.getFlexMinutos()).orElse(0);
-                LocalTime horaEntradaMaxima = horaEntradaActiva.plusMinutes(flexMinutos);
-                LocalTime horaEntradaMinima = horaEntradaActiva.minusMinutes(flexMinutos);
-                LocalTime horaSalidaMinima = horaSalidaActiva.minusMinutes(flexMinutos);
-                LocalTime horaSalidaMaxima = horaSalidaActiva.plusMinutes(flexMinutos);
+                detalle.add(dtoIncompleto);
+            }
 
-                for (int i = 0; i + 1 < marcasDelDia.size(); i += 2) {
-                    RegistroAsistencia entrada = marcasDelDia.get(i);
-                    RegistroAsistencia salida = marcasDelDia.get(i + 1);
+            // ---------- Configuración de horario activo ----------
+            LocalTime horaEntradaActiva = empleado.getHoraEntrada();
+            LocalTime horaSalidaActiva = empleado.getHoraSalida();
+            boolean esSegundoHorario = false;
 
-                    // CONVERTIR fotos a Base64 (entrada/salida)
-                    String fotoEntradaBase64 = null;
-                    if (entrada.getFoto() != null && entrada.getFoto().length > 0) {
-                        fotoEntradaBase64 = Base64.getEncoder()
-                                .encodeToString(entrada.getFoto())
-                                .replaceAll("\\s+", ""); // limpio espacios/saltos
+            if (empleado.getHoraEntrada2() != null && empleado.getHoraSalida2() != null && !marcasDelDia.isEmpty()) {
+                RegistroAsistencia primeraEntrada = marcasDelDia.get(0);
+                long diffHorario1 = Math.abs(Duration.between(primeraEntrada.getHora(), empleado.getHoraEntrada()).toMinutes());
+                long diffHorario2 = Math.abs(Duration.between(primeraEntrada.getHora(), empleado.getHoraEntrada2()).toMinutes());
+                if (diffHorario2 < diffHorario1) {
+                    horaEntradaActiva = empleado.getHoraEntrada2();
+                    horaSalidaActiva = empleado.getHoraSalida2();
+                    esSegundoHorario = true;
+                }
+            }
+
+            int flexMinutos = Optional.ofNullable(empleado.getFlexMinutos()).orElse(0);
+            LocalTime horaEntradaMaxima = horaEntradaActiva.plusMinutes(flexMinutos);
+            LocalTime horaEntradaMinima = horaEntradaActiva.minusMinutes(flexMinutos);
+            LocalTime horaSalidaMinima = horaSalidaActiva.minusMinutes(flexMinutos);
+            LocalTime horaSalidaMaxima = horaSalidaActiva.plusMinutes(flexMinutos);
+
+            // ---------- Procesamiento de pares de marcas ----------
+            for (int i = 0; i + 1 < marcasDelDia.size(); i += 2) {
+                RegistroAsistencia entrada = marcasDelDia.get(i);
+                RegistroAsistencia salida = marcasDelDia.get(i + 1);
+
+                String fotoEntradaBase64 = (entrada.getFoto() != null) ? Base64.getEncoder().encodeToString(entrada.getFoto()).replaceAll("\\s+", "") : null;
+                String fotoSalidaBase64 = (salida.getFoto() != null) ? Base64.getEncoder().encodeToString(salida.getFoto()).replaceAll("\\s+", "") : null;
+
+                double horas = Duration.between(entrada.getHora(), salida.getHora()).toMinutes() / 60.0;
+                boolean esJustificada = entrada.getJustificacion() != null;
+
+                boolean llegoTarde = false;
+                int minutosTarde = 0;
+                String tipoHora;
+
+                double horasNormales = 0;
+                double horasExtras = 0;
+                double horasFinde = 0;
+
+
+                if (esFeriado || esFinDeSemana) {
+                    tipoHora = esFeriado ? "FERIADO" : "FIN_SEMANA";
+                    horasFinde = horas;
+                    totalFinde += horasFinde;
+                } else {
+                    if (i == 0 && entrada.getHora().isAfter(horaEntradaMaxima)) {
+                        llegoTarde = true;
+                        minutosTarde = (int) Duration.between(horaEntradaMaxima, entrada.getHora()).toMinutes();
+                        totalLlegadasTarde++;
+                        minutosTardeTotales += minutosTarde;
                     }
 
-                    String fotoSalidaBase64 = null;
-                    if (salida.getFoto() != null && salida.getFoto().length > 0) {
-                        fotoSalidaBase64 = Base64.getEncoder()
-                                .encodeToString(salida.getFoto())
-                                .replaceAll("\\s+", "");
+                    LocalTime inicioHorasNormales = entrada.getHora().isBefore(horaEntradaMinima) ? horaEntradaMinima : entrada.getHora();
+                    LocalTime finHorasNormales = salida.getHora().isAfter(horaSalidaMaxima) ? horaSalidaMaxima : salida.getHora();
+
+                    if (inicioHorasNormales.isBefore(finHorasNormales)) {
+                        horasNormales = Duration.between(inicioHorasNormales, finHorasNormales).toMinutes() / 60.0;
                     }
 
-                    double horas = Duration.between(entrada.getHora(), salida.getHora()).toMinutes() / 60.0;
-                    boolean esJustificada = entrada.getJustificacion() != null;
-
-                    boolean llegoTarde = false;
-                    int minutosTarde = 0;
-                    String tipoHora;
-                    double horasNormales = 0;
-                    double horasExtras = 0;
-                    double horasFinde = 0;
-                    double despuesDeHora = 0;
-
-                    if (esFeriado || esFinDeSemana) {
-                        tipoHora = esFeriado ? "FERIADO" : "FIN_SEMANA";
-                        horasFinde = horas;
-                        totalFinde += horasFinde;
-                    } else {
-                        if (i == 0 && entrada.getHora().isAfter(horaEntradaMaxima)) {
-                            llegoTarde = true;
-                            minutosTarde = (int) Duration.between(horaEntradaMaxima, entrada.getHora()).toMinutes();
-                            totalLlegadasTarde++;
-                            minutosTardeTotales += minutosTarde;
-                        }
-
-                        LocalTime inicioHorasNormales = entrada.getHora().isBefore(horaEntradaMinima)
-                                ? horaEntradaMinima : entrada.getHora();
-                        LocalTime finHorasNormales = salida.getHora().isAfter(horaSalidaMaxima)
-                                ? horaSalidaMaxima : salida.getHora();
-
-                        if (inicioHorasNormales.isBefore(finHorasNormales)) {
-                            horasNormales = Duration.between(inicioHorasNormales, finHorasNormales).toMinutes() / 60.0;
-                        }
-
-                        if (entrada.getHora().isBefore(horaEntradaMinima)) {
-                            double extrasEntrada = Duration.between(entrada.getHora(), horaEntradaMinima).toMinutes() / 60.0;
-                            horasExtras += extrasEntrada;
-                        }
-                        if (salida.getHora().isAfter(horaSalidaMaxima)) {
-                            double extrasSalida = Duration.between(horaSalidaMaxima, salida.getHora()).toMinutes() / 60.0;
-                            horasExtras += extrasSalida;
-                        }
-
-                        tipoHora = esPrimeraMarca ? (horasExtras > 0 ? "MIXTO" : "NORMAL") : "EXTRA";
-
-                        totalNormales += horasNormales;
-                        totalExtras += horasExtras;
-
-                        despuesDeHora = horasExtras * 60;
+                    if (entrada.getHora().isBefore(horaEntradaMinima)) {
+                        horasExtras += Duration.between(entrada.getHora(), horaEntradaMinima).toMinutes() / 60.0;
+                    }
+                    if (salida.getHora().isAfter(horaSalidaMaxima)) {
+                        horasExtras += Duration.between(horaSalidaMaxima, salida.getHora()).toMinutes() / 60.0;
                     }
 
-                    totalHoras += (horasNormales + horasExtras + horasFinde);
+                    tipoHora = esPrimeraMarca ? (horasExtras > 0 ? "MIXTO" : "NORMAL") : "EXTRA";
 
-                    if (esJustificada) {
-                        horasJustificadasDia += horas;
-                        tieneHorasJustificadas = true;
-                    } else {
-                        horasRealesDia += (horasNormales + horasExtras + horasFinde);
-                        tieneHorasReales = true;
-                    }
-
-                    ResumenEmpleadoDTO dto = new ResumenEmpleadoDTO();
-                    dto.setDni(empleado.getDni());
-                    dto.setNombreCompleto(empleado.getNombre() + " " + empleado.getApellido());
-                    dto.setFechaFormateada(fechaFormateada);
-                    dto.setNombreDia(nombreDia);
-                    dto.setHoraEntrada(entrada.getHora());
-                    dto.setHoraSalida(salida.getHora());
-                    dto.setTipoHora(tipoHora);
-                    dto.setHorasTrabajadas(horasNormales + horasExtras + horasFinde);
-                    dto.setMarcaIncompleta(false);
-                    dto.setAusente(false);
-                    dto.setLlegoTarde(llegoTarde);
-                    dto.setMinutosTarde(minutosTarde);
-                    dto.setEsFeriado(esFeriado);
-                    dto.setEsFinDeSemana(esFinDeSemana);
-                    dto.setJustificada(esJustificada);
-                    dto.setSegundoHorario(esSegundoHorario);
-                    dto.setHorasExtras(horasExtras);
-                    dto.setFotoEntradaBase64(fotoEntradaBase64);
-                    dto.setFotoSalidaBase64(fotoSalidaBase64);
-
-                    detalle.add(dto);
-
-                    esPrimeraMarca = false;
+                    totalNormales += horasNormales;
+                    totalExtras += horasExtras;
                 }
 
-                boolean trabajoEseDia = tieneHorasReales || tieneHorasJustificadas || !marcasDelDia.isEmpty();
-                if (trabajoEseDia && !tieneMarcasIncompletas) {
-                    diasTrabajados++;
-                }
+                totalHoras += (horasNormales + horasExtras + horasFinde);
 
-            } else {
-                boolean esAusencia = esLaboral && !tieneHorasJustificadas;
+                if (esJustificada) {
+                    tieneHorasJustificadas = true;
+                } else {
+                    tieneHorasReales = true;
+                }
 
                 ResumenEmpleadoDTO dto = new ResumenEmpleadoDTO();
                 dto.setDni(empleado.getDni());
                 dto.setNombreCompleto(empleado.getNombre() + " " + empleado.getApellido());
                 dto.setFechaFormateada(fechaFormateada);
                 dto.setNombreDia(nombreDia);
-                dto.setTipoHora("AUSENTE");
-                dto.setHorasTrabajadas(0);
-                dto.setAusente(esAusencia);
+                dto.setHoraEntrada(entrada.getHora());
+                dto.setHoraSalida(salida.getHora());
+                dto.setTipoHora(tipoHora);
+                dto.setHorasTrabajadas(horasNormales + horasExtras + horasFinde);
+                dto.setMarcaIncompleta(false);
+                dto.setAusente(false);
+                dto.setLlegoTarde(llegoTarde);
+                dto.setMinutosTarde(minutosTarde);
                 dto.setEsFeriado(esFeriado);
                 dto.setEsFinDeSemana(esFinDeSemana);
-                dto.setJustificada(false);
-                dto.setLlegoTarde(false);
-                dto.setMinutosTarde(0);
-                dto.setMarcaIncompleta(false);
-                dto.setSegundoHorario(false);
-                dto.setFotoEntradaBase64(null);
-                dto.setFotoSalidaBase64(null);
+                dto.setJustificada(esJustificada);
+                dto.setSegundoHorario(esSegundoHorario);
+                dto.setHorasExtras(horasExtras);
+                dto.setFotoEntradaBase64(fotoEntradaBase64);
+                dto.setFotoSalidaBase64(fotoSalidaBase64);
+
+                // ---------- Revisar ausencias asociadas ----------
+                if (esLaboral) {
+                    Ausencia ausenciaDia = ausenciaService.obtenerAusenciaEmpleadoEnFecha(empleado, actual);
+                    if (ausenciaDia != null) {
+                        dto.setAusente(true);
+                        dto.setTipoDeAusencia(ausenciaDia.getTipoDeAusencia());
+                        dto.setJustificada(ausenciaDia.getTipoDeAusencia() != Ausencia.TipoDeAusencia.INJUSTIFICADA
+                                && ausenciaDia.getTipoDeAusencia() != Ausencia.TipoDeAusencia.VACACIONES);
+                        if (ausenciaDia.getTipoDeAusencia() == Ausencia.TipoDeAusencia.INJUSTIFICADA) {
+                            totalAusencias++;
+                        }
+                    }
+                }
 
                 detalle.add(dto);
+                esPrimeraMarca = false;
+            }
 
-                if (esAusencia) {
+            // ---------- Día sin marcas ----------
+            if (marcasDelDia.isEmpty()) {
+                ResumenEmpleadoDTO dto = new ResumenEmpleadoDTO();
+                dto.setDni(empleado.getDni());
+                dto.setNombreCompleto(empleado.getNombre() + " " + empleado.getApellido());
+                dto.setFechaFormateada(fechaFormateada);
+                dto.setNombreDia(nombreDia);
+                dto.setHorasTrabajadas(0);
+                dto.setEsFeriado(esFeriado);
+                dto.setEsFinDeSemana(esFinDeSemana);
+
+                if (esLaboral) {
+                    dto.setTipoHora("AUSENTE");
+                    dto.setAusente(true);
+                    dto.setJustificada(false);
+                    dto.setTipoDeAusencia(Ausencia.TipoDeAusencia.INJUSTIFICADA);
                     totalAusencias++;
+                } else {
+                    dto.setTipoHora(esFeriado ? "FERIADO" : "FIN_SEMANA");
+                    dto.setAusente(false);
+                    dto.setJustificada(false);
+                    dto.setTipoDeAusencia(null);
                 }
+
+                detalle.add(dto);
+            }
+
+            boolean trabajoEseDia = tieneHorasReales || tieneHorasJustificadas || !marcasDelDia.isEmpty();
+            if (trabajoEseDia && !tieneMarcasIncompletas) {
+                diasTrabajados++;
             }
 
             actual = actual.plusDays(1);
         }
 
+        // ---------- Cálculo de presentismo ----------
+        boolean tieneInjustificadas = detalle.stream().anyMatch(dto ->
+                dto.isAusente() && dto.getTipoDeAusencia() == Ausencia.TipoDeAusencia.INJUSTIFICADA);
+
+        boolean tieneJustificadas = detalle.stream().anyMatch(dto ->
+                dto.isJustificada() && dto.getTipoDeAusencia() != Ausencia.TipoDeAusencia.VACACIONES);
+
+        int totalMinutosTarde = detalle.stream().mapToInt(ResumenEmpleadoDTO::getMinutosTarde).sum();
+
+        boolean presentismo = !(tieneInjustificadas || tieneJustificadas || totalMinutosTarde > 30);
+
+        detalle.forEach(dto -> dto.setPresentismo(presentismo));
+
         return detalle;
     }
+
+
     public Map<String, Object> generarDetalleEmpleadoView(String dni, LocalDate desde, LocalDate hasta) {
         Empleado empleado = empleadoRepo.findByDni(dni).orElseThrow();
         List<RegistroAsistencia> registros = registroRepository.findByEmpleadoDniAndFechaBetween(dni, desde, hasta);
@@ -448,10 +455,6 @@ public class ExcelService {
                     boolean esAusente = d.isAusente();
                     boolean noEsFeriado = !d.isEsFeriado();
                     boolean noEsFinDeSemana = !d.isEsFinDeSemana();
-                    System.out.println("Fecha: " + d.getFechaFormateada() +
-                            " - Ausente: " + esAusente +
-                            " - Feriado: " + d.isEsFeriado() +
-                            " - FinSemana: " + d.isEsFinDeSemana());
                     return esAusente && noEsFeriado && noEsFinDeSemana;
                 })
                 .toList();
@@ -482,11 +485,15 @@ public class ExcelService {
                 .mapToInt(ResumenEmpleadoDTO::getMinutosTarde) // corregido, no getMinutosTardeTotales()
                 .sum();
 
+        // Presentismo del empleado (si querés resumido, basta con tomar el primer dto, ya que todos tienen el mismo valor)
+        boolean presentismoEmpleado = !detalle.isEmpty() && detalle.get(0).isPresentismo();
+        resultado.put("presentismoEmpleado", presentismoEmpleado);
+
 
         resultado.put("totalHoras", totalHoras);
         resultado.put("totalNormales", totalNormales);
         resultado.put("totalExtras", totalExtras);
-        resultado.put("totalFindeFeriado", totalFinde);  // Usa el mismo nombre que en el segundo método        resultado.put("totalAusencias", totalAusencias);
+        resultado.put("totalFindeFeriado", totalFinde);
         resultado.put("totalLlegadasTarde", totalLlegadasTarde);
         resultado.put("diasTrabajados", diasTrabajados);
         resultado.put("minutosTardeTotales", minutosTardeTotales);
@@ -521,6 +528,7 @@ public class ExcelService {
             double totalFindeFeriado = datos.get("totalFindeFeriado") != null ? (double) datos.get("totalFindeFeriado") : 0.0;
             long totalAusencias = datos.get("totalAusencias") != null ? (long) datos.get("totalAusencias") : 0L;
             long totalLlegadasTarde = datos.get("totalLlegadasTarde") != null ? (long) datos.get("totalLlegadasTarde") : 0L;
+            boolean presentismo = datos.get("presentismoEmpleado") != null ? (boolean) datos.get("presentismoEmpleado") : false;
 
             ResumenAsistenciasDTO dto = new ResumenAsistenciasDTO(
                     empleado.getDni(),
@@ -532,7 +540,8 @@ public class ExcelService {
                     totalFindeFeriado,
                     totalAusencias,
                     totalLlegadasTarde,
-                    empleado.getTipoContrato()
+                    empleado.getTipoContrato(),
+                    presentismo
 
             );
 
@@ -617,6 +626,7 @@ public class ExcelService {
             registroRepository.save(salida2);
         }
     }
+
     public EdicionHorarioDTO prepararEdicionHorario(String dni, LocalDate fecha) {
         Empleado empleado = empleadoRepo.findByDni(dni)
                 .orElseThrow(() -> new RuntimeException("Empleado no encontrado"));

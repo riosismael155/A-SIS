@@ -1,11 +1,11 @@
 package com.asis.model.dto;
 
+import com.asis.model.Ausencia;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalTime;
-import java.util.Base64;
 
 @Data
 @AllArgsConstructor
@@ -34,6 +34,7 @@ public class ResumenEmpleadoDTO {
     private double totalExtras;
     private double totalFinde;
     private int totalAusencias;
+    private Ausencia.TipoDeAusencia tipoDeAusencia;
     private int totalLlegadasTarde;
     private int totalIncompletos;
 
@@ -60,6 +61,8 @@ public class ResumenEmpleadoDTO {
     private int minutosTarde;
     private String fotoEntradaBase64;
     private String fotoSalidaBase64;
+    private boolean presentismo;
+
 
 
 // Agregar getter y setter (si usas Lombok @Data, se generan automáticamente)
@@ -90,7 +93,7 @@ public class ResumenEmpleadoDTO {
                               boolean justificada,
                               boolean tieneHorasJustificadas, boolean tieneHorasReales,
                               double horasJustificadasDia, double horasRealesDia,
-                              int diasTrabajados, int minutosTardeTotales, double despuesDeHora, int minutosTarde, String fotoEntradaBase64, String fotoSalidaBase64) {
+                              int diasTrabajados, int minutosTardeTotales, double despuesDeHora, int minutosTarde, String fotoEntradaBase64, String fotoSalidaBase64,boolean presentismo) {
         this.dni = dni;
         this.nombreCompleto = nombreCompleto;
         this.totalHoras = totalHoras;
@@ -121,5 +124,6 @@ public class ResumenEmpleadoDTO {
         this.minutosTarde = minutosTarde;
         this.fotoEntradaBase64 = fotoEntradaBase64;
         this.fotoSalidaBase64 = fotoSalidaBase64;
+        this.presentismo = presentismo;
     }
 }
