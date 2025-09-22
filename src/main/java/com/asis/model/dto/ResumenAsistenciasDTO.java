@@ -20,6 +20,7 @@ public class ResumenAsistenciasDTO {
     private long totalLlegadasTarde;
     private Empleado.TipoContrato tipoContrato;
     boolean presentismo;
+    private boolean tieneMarcasIncompletas;
 }
 
 

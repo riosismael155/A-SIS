@@ -189,8 +189,7 @@
                         </td>
 
                         <!-- Columna Ausencia -->
-                        <td th:text="${d.ausente} ? ${d.tipoDeAusencia != null ? d.tipoDeAusencia.name() : '-'} : '-'"></td>
-
+                        <td th:text="${d.tipoDeAusencia != null ? d.tipoDeAusencia.name() : '-'}"></td>
 
                     </tr>
                     </tbody>

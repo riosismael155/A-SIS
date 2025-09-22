@@ -2,22 +2,28 @@
 <html lang="es" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="fragments/header :: head('PLANILLA MENSUAL - A-SIS')">
     <link rel="icon" th:href="@{/favicon.ico}" type="image/x-icon"/>
+    <style>
+        .table-responsive {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .table-responsive thead th {
+            position: sticky;
+            top: 0;
+            background-color: #343a40;
+            color: #fff;
+            z-index: 10;
+        }
+        /* Clase para marcas incompletas */
+        .fila-marca-incompleta {
+            background-color: #ffe6e6 !important; /* Rojo muy claro */
+        }
+        .fila-marca-incompleta:hover {
+            background-color: #ffd6d6 !important; /* Rojo un poco más oscuro al hacer hover */
+        }
+    </style>
 </head>
 <body>
-
-<style>.table-responsive {
-    max-height: 400px; /* Ajusta según necesites */
-    overflow-y: auto;
-}
-
-.table-responsive thead th {
-    position: sticky;
-    top: 0;
-    background-color: #343a40; /* mismo color de table-dark */
-    color: #fff;
-    z-index: 10;
-}
-</style>
 
 
 <div th:replace="fragments/header :: body"></div>
@@ -102,6 +108,7 @@
                     <tbody>
                     <tr th:each="e : ${resumen}"
                         th:attr="data-dni=${e.dni}"
+                        th:classappend="${e.tieneMarcasIncompletas} ? 'table-warning' : ''"
                         class="clickable-row"
                         style="cursor:pointer;">
                         <td th:text="${e.dni}"></td>
@@ -113,9 +120,6 @@
                         <td th:text="${#numbers.formatDecimal(e.totalFinde, 1, 1)}"></td>
                         <td th:text="${e.presentismo ? 'Sí' : 'No'}"></td>
                         <td th:text="${e.totalAusencias}"></td>
-
-
-
                     </tr>
                     </tbody>
                 </table>

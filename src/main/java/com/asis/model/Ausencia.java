@@ -41,7 +41,8 @@ public class Ausencia {
     public enum TipoDeAusencia {
         JUSTIFICADA("Justificada"),
         VACACIONES("Vacaciones"),
-        INJUSTIFICADA("Injustificada");
+        INJUSTIFICADA("Injustificada"),
+        NO_MARCO("No marcó");
 
         private final String descripcion;
 

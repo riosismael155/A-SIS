@@ -1,129 +1,133 @@
 <!DOCTYPE html>
 <html lang="es" xmlns:th="http://www.thymeleaf.org">
-<head th:replace="fragments/header :: head('Editar Empleado - A-SIS')"><link rel="icon" th:href="@{/favicon.ico}" type="image/x-icon"/></head>
+<head th:replace="fragments/header :: head('Editar Empleado - A-SIS')">
+    <link rel="icon" th:href="@{/favicon.ico}" type="image/x-icon"/>
+
+</head>
+<script th:src="@{/js/busqueda-dinamica.js}"></script>
 
 <body>
 
 <div th:replace="fragments/header :: body"></div>
 <main class="flex-fill">
-  <div class="container">
-    <div class="bloque-elevado px-5 py-4 mt-container">
+    <div class="container">
+        <div class="bloque-elevado px-5 py-4 mt-container">
 
-      <div class="d-flex align-items-center mb-4">
-        <a href="javascript:history.back()"
-           class="me-3 color-iconos d-flex align-items-center"
-           title="Volver atrás">
-          <i class="bi bi-arrow-left-circle me-1 fs-5"></i>
-        </a>
-        <i class="bi bi-person-lines-fill fs-5 me-2 color-iconos"></i>
-        <h4 class="mb-0 text-h">Gestionar Empleados</h4>
-      </div>
+            <div class="d-flex align-items-center mb-4">
+                <a href="javascript:history.back()"
+                   class="me-3 color-iconos d-flex align-items-center"
+                   title="Volver atrás">
+                    <i class="bi bi-arrow-left-circle me-1 fs-5"></i>
+                </a>
+                <i class="bi bi-person-lines-fill fs-5 me-2 color-iconos"></i>
+                <h4 class="mb-0 text-h">Gestionar Empleados</h4>
+            </div>
 
 
-      <!-- Formulario de búsqueda -->
-      <div class="mb-4">
-        <div class="form-group d-flex flex-column position-relative">
-          <label for="empleado" class="form-label">Buscar empleado</label>
-          <input type="text" id="empleado" class="form-control"
-                 placeholder="Buscar por apellido, nombre o DNI" autocomplete="off">
+            <!-- Formulario de búsqueda -->
+            <div class="mb-4">
+                <div class="form-group d-flex flex-column position-relative">
+                    <label for="empleado" class="form-label">Buscar empleado</label>
+                    <input type="text" id="empleado" class="form-control"
+                           placeholder="Buscar por apellido, nombre o DNI" autocomplete="off">
 
-          <div id="sugerencias" class="list-group position-absolute w-100 z-3"
-               style="top: 100%; max-height: 200px; overflow-y: auto; display: none;"></div>
+                    <div id="sugerencias" class="list-group position-absolute w-100 z-3"
+                         style="top: 100%; max-height: 200px; overflow-y: auto; display: none;"></div>
+                </div>
+            </div>
+
+            <!-- Mensaje flash -->
+            <div th:if="${mensaje}" class="alert alert-success" th:text="${mensaje}"></div>
+
+            <!-- Formulario de empleado -->
+            <form id="formEditarEmpleado" th:action="@{/empleados/actualizar}" method="post" class="mt-4">
+                <input type="hidden" name="id" th:value="${empleado.id}">
+
+                <!-- Primera fila -->
+                <div class="row mb-3">
+                    <div class="col">
+                        <label for="nombre" class="form-label">Nombre</label>
+                        <input id="nombre" name="nombre" type="text" class="form-control"
+                               th:value="${empleado.nombre}" required>
+                    </div>
+
+                    <div class="col">
+                        <label for="apellido" class="form-label">Apellido</label>
+                        <input id="apellido" name="apellido" type="text" class="form-control"
+                               th:value="${empleado.apellido}" required>
+                    </div>
+
+                    <div class="col">
+                        <label for="dni" class="form-label">DNI</label>
+                        <input id="dni" name="dni" type="text" class="form-control"
+                               th:value="${empleado.dni}" required>
+                    </div>
+
+                    <div class="col">
+                        <label for="area" class="form-label">Área</label>
+                        <select id="area" name="area.id" class="form-select">
+                            <option th:each="a : ${areas}"
+                                    th:value="${a.id}"
+                                    th:text="${a.nombre}"
+                                    th:selected="${empleado.area != null} ? ${a.id} == ${empleado.area.id} : false">
+                            </option>
+                        </select>
+                    </div>
+
+                    <div class="col">
+                        <label for="tipoContrato" class="form-label">Tipo de contrato</label>
+                        <select id="tipoContrato" name="tipoContrato" class="form-select">
+                            <option th:each="tipo : ${tiposContrato}"
+                                    th:value="${tipo}"
+                                    th:text="${tipo.label}"
+                                    th:selected="${empleado.tipoContrato != null} ? ${tipo} == ${empleado.tipoContrato} : false">
+                            </option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Segunda fila -->
+                <div class="row mb-3">
+                    <div class="col">
+                        <label for="horaEntrada" class="form-label">Hora de entrada</label>
+                        <input id="horaEntrada" name="horaEntrada" type="time" class="form-control"
+                               th:value="${#temporals.format(empleado.horaEntrada, 'HH:mm')}" required>
+                    </div>
+
+                    <div class="col">
+                        <label for="horaSalida" class="form-label">Hora de salida</label>
+                        <input id="horaSalida" name="horaSalida" type="time" class="form-control"
+                               th:value="${#temporals.format(empleado.horaSalida, 'HH:mm')}" required>
+                    </div>
+
+                    <div class="col">
+                        <label for="horaEntrada2" class="form-label">2da hora de entrada</label>
+                        <input id="horaEntrada2" name="horaEntrada2" type="time" class="form-control"
+                               th:value="${empleado.horaEntrada2 != null} ? ${#temporals.format(empleado.horaEntrada2, 'HH:mm')} : ''">
+                    </div>
+
+                    <div class="col">
+                        <label for="horaSalida2" class="form-label">2da hora de salida</label>
+                        <input id="horaSalida2" name="horaSalida2" type="time" class="form-control"
+                               th:value="${empleado.horaSalida2 != null} ? ${#temporals.format(empleado.horaSalida2, 'HH:mm')} : ''">
+                    </div>
+
+                    <div class="col">
+                        <label for="flexMinutos" class="form-label">Flexibilidad (min)</label>
+                        <input id="flexMinutos" name="flexMinutos" type="number" class="form-control"
+                               th:value="${empleado.flexMinutos}" readonly>
+                    </div>
+
+                    <div class="col d-flex align-items-end">
+                        <button type="submit" class="btn-action btn-nowrap w-100">
+                            <i class="bi bi-save me-1"></i> Actualizar
+                        </button>
+                    </div>
+                </div>
+            </form>
+
         </div>
-      </div>
-
-      <!-- Mensaje flash -->
-      <div th:if="${mensaje}" class="alert alert-success" th:text="${mensaje}"></div>
-
-      <!-- Formulario de empleado -->
-      <form id="formEditarEmpleado" th:action="@{/empleados/actualizar}" method="post" class="mt-4">
-        <input type="hidden" name="id" th:value="${empleado.id}">
-
-        <!-- Primera fila -->
-        <div class="row mb-3">
-          <div class="col">
-            <label for="nombre" class="form-label">Nombre</label>
-            <input id="nombre" name="nombre" type="text" class="form-control"
-                   th:value="${empleado.nombre}" required>
-          </div>
-
-          <div class="col">
-            <label for="apellido" class="form-label">Apellido</label>
-            <input id="apellido" name="apellido" type="text" class="form-control"
-                   th:value="${empleado.apellido}" required>
-          </div>
-
-          <div class="col">
-            <label for="dni" class="form-label">DNI</label>
-            <input id="dni" name="dni" type="text" class="form-control"
-                   th:value="${empleado.dni}" required>
-          </div>
-
-          <div class="col">
-            <label for="area" class="form-label">Área</label>
-            <select id="area" name="area.id" class="form-select">
-              <option th:each="a : ${areas}"
-                      th:value="${a.id}"
-                      th:text="${a.nombre}"
-                      th:selected="${empleado.area != null} ? ${a.id} == ${empleado.area.id} : false">
-              </option>
-            </select>
-          </div>
-
-          <div class="col">
-            <label for="tipoContrato" class="form-label">Tipo de contrato</label>
-            <select id="tipoContrato" name="tipoContrato" class="form-select">
-              <option th:each="tipo : ${tiposContrato}"
-                      th:value="${tipo}"
-                      th:text="${tipo.label}"
-                      th:selected="${empleado.tipoContrato != null} ? ${tipo} == ${empleado.tipoContrato} : false">
-              </option>
-            </select>
-          </div>
-        </div>
-
-        <!-- Segunda fila -->
-        <div class="row mb-3">
-          <div class="col">
-            <label for="horaEntrada" class="form-label">Hora de entrada</label>
-            <input id="horaEntrada" name="horaEntrada" type="time" class="form-control"
-                   th:value="${#temporals.format(empleado.horaEntrada, 'HH:mm')}" required>
-          </div>
-
-          <div class="col">
-            <label for="horaSalida" class="form-label">Hora de salida</label>
-            <input id="horaSalida" name="horaSalida" type="time" class="form-control"
-                   th:value="${#temporals.format(empleado.horaSalida, 'HH:mm')}" required>
-          </div>
-
-          <div class="col">
-            <label for="horaEntrada2" class="form-label">2da hora de entrada</label>
-            <input id="horaEntrada2" name="horaEntrada2" type="time" class="form-control"
-                   th:value="${empleado.horaEntrada2 != null} ? ${#temporals.format(empleado.horaEntrada2, 'HH:mm')} : ''">
-          </div>
-
-          <div class="col">
-            <label for="horaSalida2" class="form-label">2da hora de salida</label>
-            <input id="horaSalida2" name="horaSalida2" type="time" class="form-control"
-                   th:value="${empleado.horaSalida2 != null} ? ${#temporals.format(empleado.horaSalida2, 'HH:mm')} : ''">
-          </div>
-
-          <div class="col">
-            <label for="flexMinutos" class="form-label">Flexibilidad (min)</label>
-            <input id="flexMinutos" name="flexMinutos" type="number" class="form-control"
-                   th:value="${empleado.flexMinutos}" readonly>
-          </div>
-
-          <div class="col d-flex align-items-end">
-            <button type="submit" class="btn-action btn-nowrap w-100">
-              <i class="bi bi-save me-1"></i> Actualizar
-            </button>
-          </div>
-        </div>
-      </form>
-
     </div>
-  </div>
 </main>
 
 <div th:replace="fragments/footer :: footer"></div>

@@ -48,6 +48,7 @@ public class RegistroAsistencia {
         NORMAL,
         EXTRA,
         FIN_SEMANA
+
     }
 
 
