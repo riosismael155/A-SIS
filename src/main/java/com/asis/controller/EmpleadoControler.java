@@ -27,14 +27,16 @@ public class EmpleadoControler {
     private final AreaRepository areaRepo;
     private final ExcelService excelService;
 
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'SUPERVISOR')")
     @GetMapping("/buscar")
     @ResponseBody
     public List<BusquedaEmpleadoDTO> buscarEmpleados(@RequestParam String q) {
         List<Empleado> empleados = empleadoRepo.buscarPorNombreApellidoODni(q);
         return empleados.stream()
-                .map(e -> new BusquedaEmpleadoDTO(e.getId(),e.getNombre(), e.getApellido(), e.getDni()))
+                .map(e -> new BusquedaEmpleadoDTO(e.getId(), e.getNombre(), e.getApellido(), e.getDni()))
                 .collect(Collectors.toList());
     }
+
     @GetMapping("/cargar")
     public String mostrarFormularioEmpleado(Model model) {
         Empleado empleado = new Empleado();

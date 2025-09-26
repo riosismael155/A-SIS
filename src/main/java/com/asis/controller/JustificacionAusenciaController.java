@@ -21,6 +21,7 @@ public class JustificacionAusenciaController {
     private final EmpleadoRepository empleadoRepo;
     private final JustificacionAusenciaService justificacionService;
 
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'SUPERVISOR')")
     @GetMapping("/cargar")
     public String verPantallaJustificaciones(Model model) {
         model.addAttribute("empleados", empleadoRepo.findAll());
@@ -28,7 +29,6 @@ public class JustificacionAusenciaController {
         model.addAttribute("justificaciones", justificacionService.listarJustificaciones()); // agregamos la lista
         return "asistencias/justificaciones"; // misma vista para formulario y lista
     }
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR')")
     @PostMapping("/guardar")
     public String justificarAusencia(@RequestParam("dni") String dni,
                                      @RequestParam("desde") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
