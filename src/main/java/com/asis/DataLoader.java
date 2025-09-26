@@ -20,15 +20,7 @@ public class DataLoader {
                                                   EmpleadoRepository empleadoRepo,
                                                   PasswordEncoder passwordEncoder) {
         return args -> {
-            // 1. Crear usuario admin
-            Usuario admin = usuarioRepo.findByUsername("admin").orElseGet(() -> {
-                Usuario newAdmin = new Usuario();
-                newAdmin.setUsername("admin");
-                newAdmin.setPassword(passwordEncoder.encode("admin123"));
-                newAdmin.setRol(Rol.ADMIN);
-                newAdmin.setActivo(true);
-                return usuarioRepo.save(newAdmin);
-            });
+
 
             // 2. Crear usuario empleado con empleado asociado
             usuarioRepo.findByUsername("empleado").orElseGet(() -> {

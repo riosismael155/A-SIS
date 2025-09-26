@@ -18,7 +18,7 @@ public class Usuario {
     private String password;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(length = 20) // ajusta según los nombres de tus roles
     private Rol rol;
 
     @Column(nullable = false)

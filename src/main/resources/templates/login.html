@@ -50,11 +50,14 @@
 
                 <div class="row mb-3">
                     <div class="col-12">
-                        <button type="submit" class="btn-action btn-nowrap">
-                            <i class="bi bi-box-arrow-in-right me-1"></i> Ingresar
-                        </button>
+                        <form th:action="@{/post-login}" method="get">
+                            <button type="submit" class="btn-action btn-nowrap">
+                                <i class="bi bi-arrow-left-circle me-1"></i> Volver
+                            </button>
+                        </form>
                     </div>
                 </div>
+
             </form>
         </div>
     </div>

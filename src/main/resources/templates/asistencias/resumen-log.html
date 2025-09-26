@@ -2,29 +2,8 @@
 <html lang="es" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="fragments/header :: head('PLANILLA MENSUAL - A-SIS')">
     <link rel="icon" th:href="@{/favicon.ico}" type="image/x-icon"/>
-    <style>
-        .table-responsive {
-            max-height: 400px;
-            overflow-y: auto;
-        }
-        .table-responsive thead th {
-            position: sticky;
-            top: 0;
-            background-color: #343a40;
-            color: #fff;
-            z-index: 10;
-        }
-        /* Clase para marcas incompletas */
-        .fila-marca-incompleta {
-            background-color: #ffe6e6 !important; /* Rojo muy claro */
-        }
-        .fila-marca-incompleta:hover {
-            background-color: #ffd6d6 !important; /* Rojo un poco más oscuro al hacer hover */
-        }
-    </style>
 </head>
 <body>
-
 
 <div th:replace="fragments/header :: body"></div>
 <main class="flex-fill">
@@ -32,7 +11,7 @@
         <div class="bloque-elevado px-5 py-4 mt-container">
 
             <div class="d-flex align-items-center mb-4">
-                <a th:href="${previousPage != null ? previousPage : '/'}"
+                <a href="/asistencias/logs"
                    class="me-3 color-iconos d-flex align-items-center"
                    title="Volver atrás">
                     <i class="bi bi-arrow-left-circle me-1 fs-5"></i>
@@ -89,9 +68,9 @@
                 </div>
             </div>
             <!-- Tabla -->
-            <div class="table-responsive">
+            <div class="table-responsive" style="max-height: 550px; overflow-y: auto;">
                 <table class="table table-bordered table-hover table-excel">
-                    <thead class="table-dark">
+                    <thead class="table-dark" style="position: sticky; top: 0; z-index: 10;">
                     <tr>
                         <th>DNI</th>
                         <th>Apellido</th>
@@ -108,7 +87,7 @@
                     <tbody>
                     <tr th:each="e : ${resumen}"
                         th:attr="data-dni=${e.dni}"
-                        th:classappend="${e.tieneMarcasIncompletas} ? 'table-warning' : ''"
+                        th:classappend="${e.tieneMarcasIncompletas} ? 'table-danger' : ''"
                         class="clickable-row"
                         style="cursor:pointer;">
                         <td th:text="${e.dni}"></td>

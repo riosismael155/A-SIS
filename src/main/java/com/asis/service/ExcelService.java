@@ -61,14 +61,25 @@ public class ExcelService {
 
     public String generarDescripcion(LocalDate desde, LocalDate hasta) {
         DateTimeFormatter mesFormatter = DateTimeFormatter.ofPattern("MMMM", new Locale("es", "ES"));
-        String mes = desde.format(mesFormatter);
-        return "Mes de " + capitalize(mes) + " " + desde.getYear();
+
+        String mesDesde = capitalize(desde.format(mesFormatter));
+        String mesHasta = capitalize(hasta.format(mesFormatter));
+
+        // Si ambos meses son iguales, mostramos solo uno (caso raro si justo es dentro del mismo mes)
+        if (desde.getMonth().equals(hasta.getMonth())) {
+            return "Mes de " + mesDesde + " " + desde.getYear();
+        }
+
+
+
+        // Caso normal: dos meses del mismo año
+        return "Planilla " + mesDesde + "-" + mesHasta;
     }
 
     private String capitalize(String texto) {
-        if (texto == null || texto.isEmpty()) return texto;
         return texto.substring(0, 1).toUpperCase() + texto.substring(1);
     }
+
 
     public List<Marca> extraerMarcasValidas(MultipartFile archivo, LocalDate desde, LocalDate hasta) {
         List<Marca> todas = leerExcel(archivo);
@@ -539,6 +550,7 @@ public class ExcelService {
         List<Empleado> empleados = tipoContrato != null
                 ? empleadoRepo.findByTipoContrato(tipoContrato)
                 : empleadoRepo.findAll();
+        empleados.sort(Comparator.comparing(Empleado::getApellido));
 
         List<ResumenAsistenciasDTO> resumen = new ArrayList<>();
 

@@ -19,4 +19,10 @@ public class PageController {
     }
 
 
+    @GetMapping("/acceso-denegado")
+    public String accesoDenegado() {
+        return "acceso-denegado"; // nombre del template Thymeleaf
+    }
 }
+
+

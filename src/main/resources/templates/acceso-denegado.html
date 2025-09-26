@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/header :: head('Acceso Denegado - A-SIS')">
+    <link rel="icon" type="image/x-icon" th:href="@{/favicon.ico}">
+</head>
+<body>
+
+<div th:replace="fragments/header :: body"></div>
+
+
+<main class="flex-fill">
+    <div class="container">
+        <div class="bloque-elevado px-5 py-4 mt-container">
+
+            <div class="d-flex align-items-center mb-4">
+                <a href="javascript:history.back()"
+                   class="me-3 color-iconos d-flex align-items-center"
+                   title="Volver atrás">
+                    <i class="bi bi-arrow-left-circle me-1 fs-5"></i>
+                </a>
+                <i class="bi bi-x-circle fs-5 color-iconos me-2"></i> <!-- icono de acceso denegado -->
+                <h4 class="mb-0 text-h">Acceso denegado</h4>
+            </div>
+
+
+            <!-- Mensaje de acceso denegado -->
+            <div class="alert alert-danger mb-4">
+                <i class="bi bi-x-circle-fill me-2"></i>
+                <span>No tenés permisos para acceder a esta sección. Por favor, contactá al administrador si creés que esto es un error.</span>
+            </div>
+
+        </div>
+    </div>
+</main>
+
+<div th:replace="fragments/footer :: footer"></div>
+
+</body>
+</html>

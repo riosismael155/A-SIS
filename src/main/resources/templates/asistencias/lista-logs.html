@@ -9,7 +9,7 @@
         <div class="bloque-elevado px-5 py-4 mt-container">
 
             <div class="d-flex align-items-center mb-4">
-                <a href="javascript:history.back()"
+                <a href="/"
                    class="me-3 color-iconos d-flex align-items-center"
                    title="Volver atrás">
                     <i class="bi bi-arrow-left-circle me-1 fs-5"></i>
@@ -26,6 +26,7 @@
                 <table class="table table-bordered table-hover table-excel">
                     <thead class="table-dark">
                     <tr>
+                        <th>Descripción</th>
                         <th>Desde</th>
                         <th>Hasta</th>
                         <th>Fecha de Carga</th>
@@ -34,6 +35,7 @@
                     </thead>
                     <tbody>
                     <tr th:each="log : ${logs}">
+                        <td th:text="${log.descripcion}"></td>
                         <td th:text="${#temporals.format(log.desde, 'dd/MM/yyyy')}"></td>
                         <td th:text="${#temporals.format(log.hasta, 'dd/MM/yyyy')}"></td>
                         <td th:text="${#temporals.format(log.fechaCarga, 'dd/MM/yyyy HH:mm')}"></td>

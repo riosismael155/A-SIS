@@ -7,6 +7,7 @@ import com.asis.repository.AreaRepository;
 import com.asis.repository.EmpleadoRepository;
 import com.asis.service.ExcelService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -19,6 +20,8 @@ import java.util.stream.Collectors;
 @Controller
 @RequiredArgsConstructor
 @RequestMapping("/empleados")
+@PreAuthorize("hasAnyRole('ADMINISTRADOR')")
+
 public class EmpleadoControler {
     private final EmpleadoRepository empleadoRepo;
     private final AreaRepository areaRepo;
@@ -32,7 +35,6 @@ public class EmpleadoControler {
                 .map(e -> new BusquedaEmpleadoDTO(e.getId(),e.getNombre(), e.getApellido(), e.getDni()))
                 .collect(Collectors.toList());
     }
-
     @GetMapping("/cargar")
     public String mostrarFormularioEmpleado(Model model) {
         Empleado empleado = new Empleado();
@@ -47,7 +49,6 @@ public class EmpleadoControler {
 
         return "empleados/carga";
     }
-
 
     @PostMapping("/guardar")
     public String guardarEmpleado(@org.springframework.web.bind.annotation.ModelAttribute Empleado empleado,

@@ -27,13 +27,15 @@ public class UsuarioService {
         String encodedPassword = passwordEncoder.encode(usuario.getPassword());
         usuario.setPassword(encodedPassword);
 
-        Empleado empleado = empleadoRepository.findById(empleadoId)
-                .orElseThrow(() -> new RuntimeException("Empleado no encontrado"));
-
-        usuario.setEmpleado(empleado);
-        empleado.setUsuario(usuario);
+        if (empleadoId != null) {
+            Empleado empleado = empleadoRepository.findById(empleadoId)
+                    .orElseThrow(() -> new RuntimeException("Empleado no encontrado"));
+            usuario.setEmpleado(empleado);
+            empleado.setUsuario(usuario);
+        }
 
         return usuarioRepository.save(usuario);
     }
+
 
 }

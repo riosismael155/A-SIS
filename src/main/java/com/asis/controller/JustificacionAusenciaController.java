@@ -5,6 +5,7 @@ import com.asis.repository.EmpleadoRepository;
 import com.asis.service.JustificacionAusenciaService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -13,6 +14,7 @@ import java.time.LocalDate;
 
 @Controller
 @RequestMapping("/justificaciones")
+@PreAuthorize("hasAnyRole('ADMINISTRADOR')")
 @RequiredArgsConstructor
 public class JustificacionAusenciaController {
 
@@ -26,7 +28,7 @@ public class JustificacionAusenciaController {
         model.addAttribute("justificaciones", justificacionService.listarJustificaciones()); // agregamos la lista
         return "asistencias/justificaciones"; // misma vista para formulario y lista
     }
-
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR')")
     @PostMapping("/guardar")
     public String justificarAusencia(@RequestParam("dni") String dni,
                                      @RequestParam("desde") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
@@ -41,7 +43,6 @@ public class JustificacionAusenciaController {
         return "redirect:/justificaciones/cargar#listado";
     }
 
-    // Eliminar una justificación
     @PostMapping("/eliminar/{id}")
     public String eliminarJustificacion(@PathVariable Long id) {
         justificacionService.eliminarJustificacion(id);

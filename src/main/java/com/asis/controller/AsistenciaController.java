@@ -14,6 +14,7 @@ import com.asis.service.ExcelService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -31,12 +32,12 @@ import java.util.Map;
 public class AsistenciaController {
 
     private final EmpleadoRepository empleadoRepo;
-
     private final RegistroRepository registroRepo;
     private final EmpleadoService empleadoService;
     private final LogCargaAsistenciaRepository cargaAsistRepo;
     private final ExcelService excelService;
 
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
     @GetMapping("/cargar")
     public String mostrarFormularioCarga(Model model) {
         LocalDate hoy = LocalDate.now();
@@ -54,6 +55,7 @@ public class AsistenciaController {
     }
 
 
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
     @PostMapping("/procesar")
     public String procesarArchivo(@ModelAttribute CargaAsistenciaDTO form, RedirectAttributes redirectAttrs) {
         excelService.cargarYGuardarAsistencias(form);  // Ya guarda todo, genera descripción y log
@@ -67,7 +69,7 @@ public class AsistenciaController {
         return "redirect:/asistencias/logs";
     }
 
-
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'SUPERVISOR')")
     @GetMapping("/logs")
     public String listarLogs(Model model) {
         List<LogCargaAsistencia> logs = cargaAsistRepo
@@ -80,6 +82,8 @@ public class AsistenciaController {
         return "asistencias/lista-logs";
     }
 
+
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'SUPERVISOR')")
     @GetMapping("/resumen-por-log/{logId}")
     public String mostrarResumenTotalesPorLog(
             @PathVariable Long logId,
@@ -87,12 +91,16 @@ public class AsistenciaController {
             Model model) {
 
         Empleado.TipoContrato tipoEnum = null;
+
         if (tipoContrato != null && !tipoContrato.isEmpty()) {
             try {
                 tipoEnum = Empleado.TipoContrato.valueOf(tipoContrato);
             } catch (IllegalArgumentException e) {
                 // Manejar error si es necesario
             }
+        } else {
+            // ✅ Valor por defecto si no viene el parámetro
+            tipoEnum = Empleado.TipoContrato.PERMANENTE;
         }
 
         List<ResumenAsistenciasDTO> resumen = excelService.generarResumenTotalesPorLog(logId, tipoEnum);
@@ -102,8 +110,10 @@ public class AsistenciaController {
         model.addAttribute("tiposContrato", Empleado.TipoContrato.values());
         model.addAttribute("tipoContratoSeleccionado", tipoEnum);
 
-        return "asistencias/resumen-log";  // Misma plantilla para todos los casos
+        return "asistencias/resumen-log";
     }
+
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR')")
     @PostMapping("/logs/eliminar/{logId}")
     public String eliminarLog(@PathVariable Long logId, RedirectAttributes redirectAttrs) {
         cargaAsistRepo.findById(logId).ifPresentOrElse(log -> {
@@ -121,7 +131,7 @@ public class AsistenciaController {
         return "redirect:/asistencias/logs";
     }
 
-
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'SUPERVISOR')")
     @GetMapping("/detalle")
     public String detalleAsistencia(
             @RequestParam(name = "dni", required = false) String dni,
@@ -195,6 +205,8 @@ public class AsistenciaController {
         return "asistencias/detalle-asistencias";
     }
 
+
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'SUPERVISOR')")
     private void asegurarAtributosModelo(Model model, Map<String, Object> detalleModel) {
         // Lista de atributos que deben estar siempre presentes
         String[] atributosRequeridos = {
@@ -230,6 +242,7 @@ public class AsistenciaController {
         }
     }
 
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR')")
     @GetMapping("/editar-horario")
     public String mostrarFormularioEdicion(
             @RequestParam String dni,
@@ -249,6 +262,7 @@ public class AsistenciaController {
         return "asistencias/editar-horario";
     }
 
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR')")
     @PostMapping("/guardar-horario")
     public String guardarHorarioEditado(
             @ModelAttribute EdicionHorarioDTO edicionDTO,
@@ -261,10 +275,20 @@ public class AsistenciaController {
             redirectAttributes.addFlashAttribute("error", "Error al actualizar horarios: " + e.getMessage());
         }
 
-        // Redirecciona de vuelta al formulario de edición con los mismos parámetros
-        return "redirect:/asistencias/editar-horario?dni=" + edicionDTO.getDni() +
-                "&fecha=" + edicionDTO.getFecha().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+        LocalDate hoy = LocalDate.now();
+        LocalDate desde = hoy.minusMonths(1).withDayOfMonth(21);
+        LocalDate hasta = hoy.withDayOfMonth(20);
+
+        if (hoy.getDayOfMonth() < 20) {
+            hasta = hoy.minusMonths(1).withDayOfMonth(20);
+        }
+
+        return "redirect:/asistencias/detalle?dni=" + edicionDTO.getDni() +
+                "&desde=" + desde.format(DateTimeFormatter.ISO_DATE) +
+                "&hasta=" + hasta.format(DateTimeFormatter.ISO_DATE) +
+                "#tabla-asistencia";
     }
+
 }
 
 
