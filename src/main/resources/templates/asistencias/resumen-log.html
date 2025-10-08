@@ -2,6 +2,7 @@
 <html lang="es" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="fragments/header :: head('PLANILLA MENSUAL')">
     <link rel="icon" th:href="@{/favicon.ico}" type="image/x-icon"/>
+
 </head>
 <body>
 
@@ -35,7 +36,7 @@
                         <i class="bi bi-funnel"></i>
                     </span>
                                 <select id="tipoContrato" name="tipoContrato" class="form-select border-start-0 ps-1">
-                                    <option value="">Todos los contratos</option>
+                                    <option value="ALL">Todos los contratos</option>
                                     <option th:each="tipo : ${tiposContrato}"
                                             th:value="${tipo.name()}"
                                             th:text="${tipo}"
@@ -72,22 +73,23 @@
                 <table class="table table-bordered table-hover table-excel">
                     <thead class="table-dark" style="position: sticky; top: 0; z-index: 10;">
                     <tr>
-                        <th>DNI</th>
-                        <th>Apellido</th>
-                        <th>Nombre</th>
-                        <th>Total Horas</th>
-                        <th>Normales</th>
-                        <th>Extras</th>
-                        <th>Finde/Feriado</th>
-                        <th>Presentismo</th>
-                        <th>Ausencias Injustificadas</th>
+                        <th onclick="sortTable(0)">DNI <i class="bi bi-funnel sort-icon"></i></th>
+                        <th onclick="sortTable(1)">Apellido <i class="bi bi-funnel sort-icon"></i></th>
+                        <th onclick="sortTable(2)">Nombre <i class="bi bi-funnel sort-icon"></i></th>
+                        <th onclick="sortTable(3)">Total Horas <i class="bi bi-funnel sort-icon"></i></th>
+                        <th onclick="sortTable(4)">Normales <i class="bi bi-funnel sort-icon"></i></th>
+                        <th onclick="sortTable(5)">Extras <i class="bi bi-funnel sort-icon"></i></th>
+                        <th onclick="sortTable(6)">Finde/Feriado <i class="bi bi-funnel sort-icon"></i></th>
+                        <th onclick="sortTable(7)">Presentismo <i class="bi bi-funnel sort-icon"></i></th>
+                        <th onclick="sortTable(8)">Ausencias Injustificadas <i class="bi bi-funnel sort-icon"></i></th>
 
                     </tr>
                     </thead>
                     <tbody>
                     <tr th:each="e : ${resumen}"
                         th:attr="data-dni=${e.dni}"
-                        th:classappend="${e.tieneMarcasIncompletas} ? 'table-danger' : ''"
+                        th:classappend="${ e.tieneMarcasIncompletas ? 'table-danger'
+                     : (e.totalAusencias > 0 ? 'table-warning' : 'table-success') }"
                         class="clickable-row"
                         style="cursor:pointer;">
                         <td th:text="${e.dni}"></td>
@@ -100,6 +102,7 @@
                         <td th:text="${e.presentismo ? 'Sí' : 'No'}"></td>
                         <td th:text="${e.totalAusencias}"></td>
                     </tr>
+
                     </tbody>
                 </table>
             </div>
@@ -109,22 +112,89 @@
 </main>
 
 <div th:replace="fragments/footer :: footer"></div>
+
+
 <script th:inline="javascript">
     document.addEventListener("DOMContentLoaded", function () {
-    const rows = document.querySelectorAll(".clickable-row");
-    const desde = /*[[${#temporals.format(log.desde, 'yyyy-MM-dd')}]]*/ '2025-06-21';
-    const hasta = /*[[${#temporals.format(log.hasta, 'yyyy-MM-dd')}]]*/ '2025-07-20';
+        const rows = document.querySelectorAll(".clickable-row");
+        const desde = /*[[${#temporals.format(log.desde, 'yyyy-MM-dd')}]]*/ '2025-06-21';
+        const hasta = /*[[${#temporals.format(log.hasta, 'yyyy-MM-dd')}]]*/ '2025-07-20';
 
-    rows.forEach(row => {
-        row.addEventListener("click", () => {
-            const dni = row.getAttribute("data-dni");
-            const url = `/asistencias/detalle?dni=${dni}&desde=${desde}&hasta=${hasta}`;
-            window.open(url, '_blank'); // <-- abre en nueva pestaña
+        rows.forEach(row => {
+            row.addEventListener("click", () => {
+                const dni = row.getAttribute("data-dni");
+                const url = `/asistencias/detalle?dni=${dni}&desde=${desde}&hasta=${hasta}`;
+                window.open(url, '_blank');
+            });
+        });
+
+        // Inicializar sin iconos visibles
+        document.querySelectorAll(".sort-icon").forEach(i => {
+            i.className = "bi bi-arrow-down-up sort-icon";
+            i.style.opacity = "0"; // Completamente transparente al inicio
         });
     });
-});
 
+    // Definimos la función en window para que la encuentren los onclick de los <th>
+    window.sortTable = function(n) {
+        const tableEl = document.querySelector(".table-excel");
+        if (!tableEl) return;
+        const tbody = tableEl.querySelector("tbody");
+        if (!tbody) return;
+        const rows = Array.from(tbody.rows);
+        if (rows.length === 0) return;
+
+        // Detectar números (limpiamos puntos y comas comunes en Argentina)
+        const sample = rows[0].cells[n].innerText.trim();
+        const numericSample = sample.replace(/\./g, '').replace(',', '.');
+        const isNumeric = !isNaN(parseFloat(numericSample));
+
+        rows.sort((a, b) => {
+            let valA = a.cells[n].innerText.trim();
+            let valB = b.cells[n].innerText.trim();
+
+            if (isNumeric) {
+                valA = parseFloat(valA.replace(/\./g, '').replace(',', '.')) || 0;
+                valB = parseFloat(valB.replace(/\./g, '').replace(',', '.')) || 0;
+                return valA - valB;
+            } else {
+                return valA.localeCompare(valB, undefined, {numeric: true, sensitivity: 'base'});
+            }
+        });
+
+        // Alternar orden asc/desc
+        const prevCol = tableEl.dataset.sortedCol;
+        const prevOrder = tableEl.dataset.sortedOrder;
+        if (String(prevCol) === String(n) && prevOrder === 'asc') {
+            rows.reverse();
+            tableEl.dataset.sortedOrder = 'desc';
+        } else {
+            tableEl.dataset.sortedOrder = 'asc';
+        }
+        tableEl.dataset.sortedCol = n;
+
+        // Reemplazar filas en tbody
+        tbody.innerHTML = "";
+        rows.forEach(row => tbody.appendChild(row));
+
+        // Actualizar íconos: reset todos y marcar el activo
+        document.querySelectorAll(".sort-icon").forEach(i => {
+            i.className = "bi bi-arrow-down-up sort-icon";
+            i.style.opacity = "0"; // Ocultar todos
+            i.classList.remove('active');
+        });
+
+        const th = tableEl.querySelectorAll("thead th")[n];
+        const icon = th ? th.querySelector(".sort-icon") : null;
+        if (icon) {
+            icon.style.opacity = "1"; // Hacer visible el icono activo
+            if (tableEl.dataset.sortedOrder === 'asc') {
+                icon.className = "bi bi-arrow-up-short sort-icon active";
+            } else {
+                icon.className = "bi bi-arrow-down-short sort-icon active";
+            }
+        }
+    };
 </script>
-
 </body>
 </html>

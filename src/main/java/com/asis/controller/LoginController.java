@@ -93,13 +93,16 @@ public class LoginController {
         Integer ultimoOrden = registroRepo.findMaxOrdenDiaByEmpleadoAndFecha(empleado.getId(), hoy);
         int nuevoOrden = (ultimoOrden == null) ? 1 : ultimoOrden + 1;
 
+        // Restar 3 horas al tiempo actual
+        LocalTime horaActualMenos3 = LocalTime.now().minusHours(3);
+
         RegistroAsistencia registro = new RegistroAsistencia();
         registro.setFecha(hoy);
-        registro.setHora(LocalTime.now());
+        registro.setHora(horaActualMenos3); // Usar la hora ajustada
         registro.setOrdenDia(nuevoOrden);
         registro.setEmpleado(empleado);
         registro.setTipo(nuevoOrden % 2 == 1 ? "ENTRADA" : "SALIDA");
-        registro.setFoto(foto); // Guardar la foto
+        registro.setFoto(foto);
 
         registroRepo.save(registro);
     }

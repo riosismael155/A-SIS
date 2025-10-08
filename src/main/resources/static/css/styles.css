@@ -158,13 +158,18 @@ a {
   text-align: center;
   min-width: 80px;
 }
-.table-excel th:hover, .table-excel td:hover {
+ .table-excel td:hover {
   background-color: rgb(231.9076923077, 242.2384615385, 228.2615384615);
 }
 .table-excel thead {
   background-color: #E2F0D9;
   font-weight: bold;
+  cursor:pointer;
 }
+.table-excel th:hover{
+background-color:#444444;
+}
+
 .table-excel tbody tr:nth-child(even) {
   background-color: #F9F9F9;
 }

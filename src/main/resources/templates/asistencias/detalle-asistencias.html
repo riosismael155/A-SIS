@@ -6,7 +6,7 @@
 
 <body>
 <div th:replace="fragments/header :: body"></div>
-<main class="flex-fill">
+    <main class="flex-fill">
     <div class="container">
         <div class="bloque-elevado px-5 py-4 mt-container">
 
@@ -77,7 +77,7 @@
                         <li><strong>Presentismo:</strong>
                             <span th:text="${presentismoEmpleado} ? 'Sí' : 'No'"></span>
                         </li>
-                        <li><strong>Ausencias Injustificadas:</strong>
+                        <li><strong>Faltas sin aviso:</strong>
                             <span th:text="${totalAusencias ?: 0}"></span></li>
                     </ul>
                 </div>
@@ -104,7 +104,7 @@
                         th:with="
         esPrimeraFilaDelDia=${iterStat.index == 0 or d.fechaFormateada != detalle[iterStat.index - 1].fechaFormateada},
         rowClass=${d.ausente ? (d.tipoDeAusencia == 'VACACIONES' ? 'vacaciones' :
-                    (d.tipoDeAusencia == 'JUSTIFICADA' ? 'justificada' : 'injustificada')) :
+                    (d.tipoDeAusencia == 'JUSTIFICADA' ? 'justificada' : 'Falta sin aviso')) :
                     (d.marcaIncompleta ? 'incompleto' :
                     (d.esFeriado ? 'feriado' :
                     (d.esFinDeSemana ? 'finde' : 'normal')))}
@@ -156,7 +156,18 @@
                         </td>
 
                         <!-- Horas trabajadas -->
-                        <td th:text="${d.horasTrabajadas > 0 ? #numbers.formatDecimal(d.horasTrabajadas, 1, 'COMMA', 2, 'POINT') + ' h' : '-'}"></td>
+                        <td>
+                            <div th:if="${d.horasTrabajadas > 0}">
+                                <span th:text="${#numbers.formatDecimal(d.horasTrabajadas, 1, 'COMMA', 2, 'POINT') + ' h'}"></span>
+
+                                <span th:if="${d.tipoHora == 'MIXTO' and d.horasExtras > 0}"
+                                      class="badge bg-warning text-dark ms-1 small">
+            Extra(<span th:text="${#numbers.formatDecimal(d.horasExtras, 1, 'COMMA', 1, 'POINT')}"></span>h)
+        </span>
+                            </div>
+                            <span th:if="${d.horasTrabajadas <= 0}">-</span>
+                        </td>
+
 
                         <!-- Llegada tarde -->
                         <td>
@@ -201,13 +212,15 @@
 
 <script>
     function handleRowClick(row) {
-        const dni = row.getAttribute('data-dni');
-        const fecha = row.getAttribute('data-fecha');
+    const dni = row.getAttribute('data-dni');
+    const fecha = row.getAttribute('data-fecha');
 
-        if (dni && fecha) {
-            window.location.href = `/asistencias/editar-horario?dni=${dni}&fecha=${fecha}`;
-        }
+    if (dni && fecha) {
+        const url = `/asistencias/editar-horario?dni=${dni}&fecha=${fecha}`;
+        window.open(url, '_blank'); // 👉 abre en nueva pestaña
     }
+}
+
 
     // Función para expandir imágenes al hacer click
     function expandImage(event, imgElement) {

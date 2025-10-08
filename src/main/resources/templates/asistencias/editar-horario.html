@@ -37,88 +37,43 @@
                 <input type="hidden" th:field="*{dni}" />
                 <input type="hidden" th:field="*{fecha}" />
 
-                <!-- Primer Horario (solo mostrar si hay registros o si el usuario quiere agregar) -->
-                <div class="card mb-4" th:if="${tieneRegistros or edicionDTO.horaEntrada1 != null}">
-                    <div class="card-header bg-light">
-                        <h5 class="mb-0">Horario Principal</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label for="horaEntrada1" class="form-label">Hora de Entrada</label>
-                                <input type="time" class="form-control" id="horaEntrada1"
-                                       th:field="*{horaEntrada1}" />
-                            </div>
+                <div id="horariosContainer">
+                    <div th:each="entrada, iterStat : ${edicionDTO.entradas}" class="card mb-4 horario-item">
+                        <div class="card-header bg-light">
+                            <h5 class="mb-0" th:text="${iterStat.index == 0 ? 'Horario Principal' : 'Horario Secundario'}"></h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Hora de Entrada</label>
+                                    <input type="time" class="form-control"
+                                           th:value="${entrada}"
+                                           th:name="entradas[__${iterStat.index}__]" />
+                                </div>
 
-                            <div class="col-md-6">
-                                <label for="horaSalida1" class="form-label">Hora de Salida</label>
-                                <input type="time" class="form-control" id="horaSalida1"
-                                       th:field="*{horaSalida1}" />
+                                <div class="col-md-6">
+                                    <label class="form-label">Hora de Salida</label>
+                                    <input type="time" class="form-control"
+                                           th:value="${edicionDTO.salidas[iterStat.index]}"
+                                           th:name="salidas[__${iterStat.index}__]" />
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Segundo Horario (solo mostrar si hay registros) -->
-                <div class="card mb-4" th:if="${edicionDTO.horaEntrada2 != null}">
-                    <div class="card-header bg-light">
-                        <h5 class="mb-0">Horario Secundario</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label for="horaEntrada2" class="form-label">Hora de Entrada</label>
-                                <input type="time" class="form-control" id="horaEntrada2"
-                                       th:field="*{horaEntrada2}" />
-                            </div>
-
-                            <div class="col-md-6">
-                                <label for="horaSalida2" class="form-label">Hora de Salida</label>
-                                <input type="time" class="form-control" id="horaSalida2"
-                                       th:field="*{horaSalida2}" />
-                            </div>
-                        </div>
-                    </div>
+                <!-- Botón para agregar otro par de horario (solo si existen registros previos) -->
+                <div class="mb-4" th:if="${tieneRegistros}">
+                    <button type="button" class="btn btn-outline-secondary" id="agregarHorarioBtn">
+                        <i class="bi bi-plus-circle me-1"></i> Agregar otro horario
+                    </button>
                 </div>
 
-                <!-- Opción para agregar segundo horario si no existe -->
-                <div class="card mb-4" th:if="${tieneRegistros and edicionDTO.horaEntrada2 == null}">
-                    <div class="card-header bg-light">
-                        <h5 class="mb-0">Agregar Horario Secundario</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="form-check form-switch mb-3">
-                            <input class="form-check-input" type="checkbox" id="agregarSegundoHorario"
-                                   onchange="toggleSegundoHorario(this)">
-                            <label class="form-check-label" for="agregarSegundoHorario">
-                                Agregar segundo horario
-                            </label>
-                        </div>
 
-                        <div id="segundoHorarioFields" class="row mb-3" style="display: none;">
-                            <div class="col-md-6">
-                                <label for="horaEntrada2" class="form-label">Hora de Entrada</label>
-                                <input type="time" class="form-control" id="horaEntrada2"
-                                       th:field="*{horaEntrada2}" />
-                            </div>
-
-                            <div class="col-md-6">
-                                <label for="horaSalida2" class="form-label">Hora de Salida</label>
-                                <input type="time" class="form-control" id="horaSalida2"
-                                       th:field="*{horaSalida2}" />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Campo "Motivo del cambio" solo visible si hay registros -->
                 <div class="mb-4" th:if="${tieneRegistros}">
                     <label for="motivoCambio" class="form-label">Motivo del cambio</label>
-                    <textarea class="form-control" id="motivoCambio" th:field="*{motivoCambio}"
-                              rows="3" required></textarea>
+                    <textarea class="form-control" id="motivoCambio" th:field="*{motivoCambio}" rows="3" required></textarea>
                 </div>
-
-
                 <div class="d-flex justify-content-between" th:if="${tieneRegistros}">
                     <button type="submit" class="btn-action">
                         <i class="bi bi-save me-1"></i> Guardar Cambios
@@ -151,5 +106,41 @@
         }
     }
 </script>
+<script>
+    document.getElementById('agregarHorarioBtn').addEventListener('click', function() {
+        const container = document.getElementById('horariosContainer');
+        const index = container.querySelectorAll('.horario-item').length;
+
+        // Crear el nuevo bloque de horario
+        const newCard = document.createElement('div');
+        newCard.classList.add('card', 'mb-4', 'horario-item');
+        newCard.innerHTML = `
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Horario Adicional</h5>
+                <button type="button" class="btn btn-sm btn-outline-danger eliminarHorarioBtn" title="Eliminar horario">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Hora de Entrada</label>
+                        <input type="time" class="form-control" name="entradas[${index}]" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Hora de Salida</label>
+                        <input type="time" class="form-control" name="salidas[${index}]" />
+                    </div>
+                </div>
+            </div>
+        `;
+
+        container.appendChild(newCard);
+
+        // Agregar funcionalidad al botón de eliminar
+        newCard.querySelector('.eliminarHorarioBtn').addEventListener('click', () => newCard.remove());
+    });
+</script>
+
 </body>
 </html>

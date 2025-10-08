@@ -87,19 +87,24 @@ public class AsistenciaController {
     @GetMapping("/resumen-por-log/{logId}")
     public String mostrarResumenTotalesPorLog(
             @PathVariable Long logId,
-            @RequestParam(required = false) String tipoContrato,  // Recibir como String
+            @RequestParam(required = false) String tipoContrato,
             Model model) {
 
         Empleado.TipoContrato tipoEnum = null;
 
         if (tipoContrato != null && !tipoContrato.isEmpty()) {
-            try {
-                tipoEnum = Empleado.TipoContrato.valueOf(tipoContrato);
-            } catch (IllegalArgumentException e) {
-                // Manejar error si es necesario
+            // Si viene "ALL" significa todos los contratos
+            if ("ALL".equals(tipoContrato)) {
+                tipoEnum = null; // null significa "todos"
+            } else {
+                try {
+                    tipoEnum = Empleado.TipoContrato.valueOf(tipoContrato);
+                } catch (IllegalArgumentException e) {
+                    // Manejar error si es necesario
+                }
             }
         } else {
-            // ✅ Valor por defecto si no viene el parámetro
+            // Primera carga: valor por defecto PERMANENTE
             tipoEnum = Empleado.TipoContrato.PERMANENTE;
         }
 
@@ -246,14 +251,14 @@ public class AsistenciaController {
     @GetMapping("/editar-horario")
     public String mostrarFormularioEdicion(
             @RequestParam String dni,
-            @RequestParam LocalDate fecha,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha,
             Model model) {
 
         // Obtenemos el DTO con los horarios basados en registros existentes
         EdicionHorarioDTO dto = excelService.prepararEdicionHorario(dni, fecha);
 
         // Verificamos si hay registros existentes
-        boolean tieneRegistros = dto.getHoraEntrada1() != null || dto.getHoraEntrada2() != null;
+        boolean tieneRegistros = !dto.getEntradas().isEmpty() || !dto.getSalidas().isEmpty();
 
         // Agregamos atributos al modelo
         model.addAttribute("edicionDTO", dto);
@@ -261,6 +266,7 @@ public class AsistenciaController {
 
         return "asistencias/editar-horario";
     }
+
 
     @PreAuthorize("hasAnyRole('ADMINISTRADOR')")
     @PostMapping("/guardar-horario")
@@ -275,18 +281,9 @@ public class AsistenciaController {
             redirectAttributes.addFlashAttribute("error", "Error al actualizar horarios: " + e.getMessage());
         }
 
-        LocalDate hoy = LocalDate.now();
-        LocalDate desde = hoy.minusMonths(1).withDayOfMonth(21);
-        LocalDate hasta = hoy.withDayOfMonth(20);
-
-        if (hoy.getDayOfMonth() < 20) {
-            hasta = hoy.minusMonths(1).withDayOfMonth(20);
-        }
-
-        return "redirect:/asistencias/detalle?dni=" + edicionDTO.getDni() +
-                "&desde=" + desde.format(DateTimeFormatter.ISO_DATE) +
-                "&hasta=" + hasta.format(DateTimeFormatter.ISO_DATE) +
-                "#tabla-asistencia";
+        // Redirigir nuevamente al formulario de edición
+        return "redirect:/asistencias/editar-horario?dni=" + edicionDTO.getDni() +
+                "&fecha=" + edicionDTO.getFecha().format(DateTimeFormatter.ISO_DATE);
     }
 
 }

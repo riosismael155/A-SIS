@@ -11,6 +11,8 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.util.Arrays;
+import java.util.List;
 
 @Controller
 @RequestMapping("/justificaciones")
@@ -25,10 +27,17 @@ public class JustificacionAusenciaController {
     @GetMapping("/cargar")
     public String verPantallaJustificaciones(Model model) {
         model.addAttribute("empleados", empleadoRepo.findAll());
-        model.addAttribute("tiposAusencia", Ausencia.TipoDeAusencia.values());
-        model.addAttribute("justificaciones", justificacionService.listarJustificaciones()); // agregamos la lista
+
+        // Filtramos para que NO aparezca FALTA_SIN_AVISO
+        List<Ausencia.TipoDeAusencia> tiposAusencia = Arrays.stream(Ausencia.TipoDeAusencia.values())
+                .filter(t -> t != Ausencia.TipoDeAusencia.FALTA_SIN_AVISO)
+                .toList();
+        model.addAttribute("tiposAusencia", tiposAusencia);
+
+        model.addAttribute("justificaciones", justificacionService.listarJustificaciones());
         return "asistencias/justificaciones"; // misma vista para formulario y lista
     }
+
     @PostMapping("/guardar")
     public String justificarAusencia(@RequestParam("dni") String dni,
                                      @RequestParam("desde") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,

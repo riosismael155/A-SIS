@@ -126,4 +126,14 @@ public class ResumenEmpleadoDTO {
         this.fotoSalidaBase64 = fotoSalidaBase64;
         this.presentismo = presentismo;
     }
+    public double getHorasExtrasParaVisualizacion() {
+        if ("EXTRA".equals(this.tipoHora)) {
+            return this.horasTrabajadas; // Para pares puramente extras, todas las horas trabajadas son extras
+        } else if ("MIXTO".equals(this.tipoHora)) {
+            return this.horasExtras; // Para mixtos, solo la parte extra
+        } else if ("FIN_SEMANA".equals(this.tipoHora) || "FERIADO".equals(this.tipoHora)) {
+            return 0; // Finde/feriado no se consideran horas extra para esta columna
+        }
+        return 0;
+    }
 }
