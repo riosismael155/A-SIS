@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
 import java.time.LocalTime;
 import java.util.List;
@@ -13,6 +14,7 @@ import java.util.List;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@ToString
 public class Empleado {
 
     @Id
@@ -38,6 +40,7 @@ public class Empleado {
     private Integer flexMinutos;     // Ej: 5
 
     @OneToMany(mappedBy = "empleado", cascade = CascadeType.ALL)
+    @ToString.Exclude
     private List<RegistroAsistencia> registros;
 
     @ManyToOne

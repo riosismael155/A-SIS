@@ -3,15 +3,26 @@
 <head th:replace="fragments/header :: head('Verificación')">
     <link rel="icon" type="image/x-icon" th:href="@{/favicon.ico}">
 </head>
+<style>
+    @media (max-width: 768px){
+       .navbar .logo-container {
+           justify-content: center !important;
+       }
+       .btn-action{
+       padding:0.5rem 0
+       width:100%;}
+
+   }
+</style>
 <body>
 
 <!-- Navbar -->
 <div class="container">
     <nav class="navbar navbar-light bg-white px-5 py-3">
-        <div class="d-flex align-items-center">
+        <div class="d-flex align-items-center justify-content-center justify-content-md-start w-100 logo-container">
             <a th:href="@{/}" class="d-flex align-items-center text-decoration-none">
                 <img th:src="@{/img/asis-logo.png}" alt="Logo" class="logo me-3">
-                <span class="h3 mb-0 text-dark">Sistema de Asistencia Municipal</span>
+                <span class="d-none d-md-block h3 mb-0 text-dark">Sistema de Asistencia Municipal</span>
             </a>
         </div>
     </nav>
@@ -42,19 +53,20 @@
                         <input id="username" name="username" type="text" class="form-control" required>
                     </div>
 
-                    <div class="col-md-6">
+                    <div class="col-md-6 mt-2">
                         <label for="password" class="form-label">Contraseña</label>
                         <input id="password" name="password" type="password" class="form-control" required>
                     </div>
-                </div>
 
-                <div class="row mb-3">
-                    <div class="col-12">
-                        <button type="submit" class="btn-action btn-nowrap">
+                    <div class="col-12 text-center text-md-start mt-4">
+                        <button type="submit" class="btn-action btn-nowrap btn-action-center ">
                             <i class="bi bi-box-arrow-in-right me-1"></i> Ingresar
                         </button>
                     </div>
+
                 </div>
+
+
             </form>
         </div>
     </div>

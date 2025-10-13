@@ -6,7 +6,7 @@
 
 <body>
 <div th:replace="fragments/header :: body"></div>
-    <main class="flex-fill">
+<main class="flex-fill">
     <div class="container">
         <div class="bloque-elevado px-5 py-4 mt-container">
 
@@ -60,8 +60,7 @@
                 <!-- Resumen -->
                 <div class="info-box mb-4">
                     <ul class="mb-0">
-                        <li><strong>Total horas trabajadas:</strong>
-                            <span th:text="${#numbers.formatDecimal(totalHoras ?: 0.0, 1, 1) + ' h'}"></span></li>
+
                         <li><strong>Horas normales:</strong>
                             <span th:text="${#numbers.formatDecimal(totalNormales ?: 0.0, 1, 1) + ' h'}"></span></li>
                         <li><strong>Horas extra:</strong>
@@ -124,18 +123,38 @@
                         <td th:text="${esPrimeraFilaDelDia} ? ${d.nombreDia} : ''"></td>
 
                         <!-- Entrada -->
-                        <td th:text="${d.horaEntrada != null ? #temporals.format(d.horaEntrada, 'HH:mm') : '-'}"></td>
+                        <td>
+    <span th:if="${d.tipoDeAusencia == null or d.tipoDeAusencia.name() == 'NO_MARCO'}">
+        <span th:text="${d.horaEntrada != null ? #temporals.format(d.horaEntrada, 'HH:mm') : '-'}"></span>
+    </span>
+                            <span th:if="${d.tipoDeAusencia != null and d.tipoDeAusencia.name() != 'NO_MARCO'}">-</span>
+                        </td>
 
                         <!-- Salida -->
-                        <td th:text="${d.horaSalida != null ? #temporals.format(d.horaSalida, 'HH:mm') : '-'}"></td>
+                        <td>
+    <span th:if="${d.tipoDeAusencia == null or d.tipoDeAusencia.name() == 'NO_MARCO'}">
+        <span th:text="${d.horaSalida != null ? #temporals.format(d.horaSalida, 'HH:mm') : '-'}"></span>
+    </span>
+                            <span th:if="${d.tipoDeAusencia != null and d.tipoDeAusencia.name() != 'NO_MARCO'}">-</span>
+                        </td>
 
                         <!-- Estado -->
                         <td>
-                            <span th:if="${d.marcaIncompleta}" class="badge bg-danger">
-                                <span th:text="${d.tipoIncompleto == 'FALTA_ENTRADA' ? 'Incompleto' :
-                                              (d.tipoIncompleto == 'FALTA_SALIDA' ? 'Incompleto' : 'Registro inválido')}"></span>
-                            </span>
-                            <span th:if="${d.ausente}" class="badge bg-secondary">Ausente</span>
+    <span th:if="${d.marcaIncompleta}" class="badge bg-danger">
+        <span th:text="${d.tipoIncompleto == 'FALTA_ENTRADA' ? 'Incompleto' :
+                      (d.tipoIncompleto == 'FALTA_SALIDA' ? 'Incompleto' : 'Registro inválido')}"></span>
+    </span>
+
+                            <!-- Simplifica la condición para ausencias -->
+                            <span th:if="${d.ausente}" class="badge bg-danger">
+        <span th:switch="${d.tipoDeAusencia?.name()}">
+            <span th:case="'FALTA_CON_AVISO'">Ausente</span>
+            <span th:case="'FALTA_SIN_AVISO'">Ausente</span>
+            <span th:case="*">Ausente</span>
+        </span>
+    </span>
+
+                            <!-- Completo -->
                             <span th:if="${!d.marcaIncompleta and !d.ausente}" class="badge bg-success">Completo</span>
                         </td>
 
@@ -157,17 +176,15 @@
 
                         <!-- Horas trabajadas -->
                         <td>
-                            <div th:if="${d.horasTrabajadas > 0}">
+                            <div th:if="${d.horasTrabajadas > 0 and (d.tipoDeAusencia == null or d.tipoDeAusencia.name() == 'NO_MARCO' or d.tipoDeAusencia.name() == 'VACACIONES' or d.tipoDeAusencia.name() == 'JUSTIFICADA')}">
                                 <span th:text="${#numbers.formatDecimal(d.horasTrabajadas, 1, 'COMMA', 2, 'POINT') + ' h'}"></span>
-
                                 <span th:if="${d.tipoHora == 'MIXTO' and d.horasExtras > 0}"
                                       class="badge bg-warning text-dark ms-1 small">
             Extra(<span th:text="${#numbers.formatDecimal(d.horasExtras, 1, 'COMMA', 1, 'POINT')}"></span>h)
         </span>
                             </div>
-                            <span th:if="${d.horasTrabajadas <= 0}">-</span>
+                            <span th:if="${d.horasTrabajadas <= 0 or (d.tipoDeAusencia != null and d.tipoDeAusencia.name() != 'NO_MARCO' and d.tipoDeAusencia.name() != 'VACACIONES' and d.tipoDeAusencia.name() != 'JUSTIFICADA')}">-</span>
                         </td>
-
 
                         <!-- Llegada tarde -->
                         <td>

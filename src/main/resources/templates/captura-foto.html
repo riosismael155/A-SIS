@@ -25,10 +25,10 @@
 <!-- Navbar -->
 <div class="container">
     <nav class="navbar navbar-light bg-white px-5 py-3">
-        <div class="d-flex align-items-center">
+        <div class="d-flex align-items-center justify-content-center justify-content-md-start w-100 logo-container">
             <a th:href="@{/}" class="d-flex align-items-center text-decoration-none">
                 <img th:src="@{/img/asis-logo.png}" alt="Logo" class="logo me-3">
-                <span class="h3 mb-0 text-dark">Sistema de Asistencia Municipal</span>
+                <span class="d-none d-md-block h3 mb-0 text-dark">Sistema de Asistencia Municipal</span>
             </a>
         </div>
     </nav>
@@ -41,7 +41,7 @@
             <!-- Título -->
             <div class="d-flex align-items-center mb-4">
                 <i class="bi bi-camera-fill fs-5 me-3 color-iconos"></i>
-                <h4 class="mb-0 text-h">Verificación de asistencia</h4>
+                <h4 class="mb-0 d-none d-md-bock text-h">Verificación de asistencia</h4>
             </div>
 
             <p class="text-muted mb-4 text-center">Por favor, permita el acceso a su cámara para registrar su asistencia</p>
@@ -65,9 +65,8 @@
 
                 <div class="col-md-5 text-center">
                     <div id="preview" style="display:none;">
-                        <h6>Previsualización</h6>
-                        <div class="preview-container border p-2 rounded mb-3">
-                            <img id="photo" src="" alt="Foto capturada" class="img-preview">
+                        <div class="preview-container  mb-3">
+                            <img id="photo" src="" alt="Foto capturada" class="img-preview border rounded">
                         </div>
 
                         <form id="upload-form" th:action="@{/registrar-asistencia}" method="post">

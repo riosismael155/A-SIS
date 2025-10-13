@@ -76,12 +76,11 @@
                         <th onclick="sortTable(0)">DNI <i class="bi bi-funnel sort-icon"></i></th>
                         <th onclick="sortTable(1)">Apellido <i class="bi bi-funnel sort-icon"></i></th>
                         <th onclick="sortTable(2)">Nombre <i class="bi bi-funnel sort-icon"></i></th>
-                        <th onclick="sortTable(3)">Total Horas <i class="bi bi-funnel sort-icon"></i></th>
-                        <th onclick="sortTable(4)">Normales <i class="bi bi-funnel sort-icon"></i></th>
-                        <th onclick="sortTable(5)">Extras <i class="bi bi-funnel sort-icon"></i></th>
-                        <th onclick="sortTable(6)">Finde/Feriado <i class="bi bi-funnel sort-icon"></i></th>
-                        <th onclick="sortTable(7)">Presentismo <i class="bi bi-funnel sort-icon"></i></th>
-                        <th onclick="sortTable(8)">Ausencias Injustificadas <i class="bi bi-funnel sort-icon"></i></th>
+                        <th onclick="sortTable(3)">Normales <i class="bi bi-funnel sort-icon"></i></th>
+                        <th onclick="sortTable(4)">Extras <i class="bi bi-funnel sort-icon"></i></th>
+                        <th onclick="sortTable(5)">Finde/Feriado <i class="bi bi-funnel sort-icon"></i></th>
+                        <th onclick="sortTable(6)">Presentismo <i class="bi bi-funnel sort-icon"></i></th>
+                        <th onclick="sortTable(7)">Ausencias Injustificadas <i class="bi bi-funnel sort-icon"></i></th>
 
                     </tr>
                     </thead>
@@ -95,7 +94,6 @@
                         <td th:text="${e.dni}"></td>
                         <td th:text="${e.apellido}"></td>
                         <td th:text="${e.nombre}"></td>
-                        <td th:text="${#numbers.formatDecimal(e.totalHoras, 1, 1)}"></td>
                         <td th:text="${#numbers.formatDecimal(e.totalNormales, 1, 1)}"></td>
                         <td th:text="${#numbers.formatDecimal(e.totalExtras, 1, 1)}"></td>
                         <td th:text="${#numbers.formatDecimal(e.totalFinde, 1, 1)}"></td>
