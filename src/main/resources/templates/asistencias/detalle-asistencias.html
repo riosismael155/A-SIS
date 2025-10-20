@@ -101,7 +101,13 @@
                     <tbody>
                     <tr th:each="d, iterStat : ${detalle}"
                         th:with="
-        esPrimeraFilaDelDia=${iterStat.index == 0 or d.fechaFormateada != detalle[iterStat.index - 1].fechaFormateada},
+        esHogarAdultos=${esHogarAdultos != null ? esHogarAdultos : false},
+        esTurnoCruzado=${#strings.contains(d.fechaFormateada, ' - ')},
+        fechaUnicaParaTurnoCruzado=${esTurnoCruzado ? d.fechaFormateada : ''},
+        esPrimeraFilaDelDia=${iterStat.index == 0 or
+                            (esHogarAdultos and esTurnoCruzado and d.fechaFormateada != detalle[iterStat.index - 1].fechaFormateada) or
+                            (!esHogarAdultos and d.fechaFormateada != detalle[iterStat.index - 1].fechaFormateada) or
+                            (esHogarAdultos and !esTurnoCruzado and d.fechaFormateada != detalle[iterStat.index - 1].fechaFormateada)},
         rowClass=${d.ausente ? (d.tipoDeAusencia == 'VACACIONES' ? 'vacaciones' :
                     (d.tipoDeAusencia == 'JUSTIFICADA' ? 'justificada' : 'Falta sin aviso')) :
                     (d.marcaIncompleta ? 'incompleto' :
@@ -110,49 +116,52 @@
     "
                         th:class="${rowClass} + ' clickable-row'"
                         th:data-dni="${d.dni}"
-                        th:data-fecha="${d.fechaFormateada != null ? #strings.substring(d.fechaFormateada, 6, 10) + '-' + #strings.substring(d.fechaFormateada, 3, 5) + '-' + #strings.substring(d.fechaFormateada, 0, 2) : ''}"
+                        th:data-fecha="${d.fechaFormateada != null ?
+                        (esTurnoCruzado ?
+                         #strings.substring(d.fechaFormateada, 6, 10) + '-' + #strings.substring(d.fechaFormateada, 0, 2) + '-CRUZADO' :
+                         #strings.substring(d.fechaFormateada, 6, 10) + '-' + #strings.substring(d.fechaFormateada, 3, 5) + '-' + #strings.substring(d.fechaFormateada, 0, 2))
+                        : ''}"
                         onclick="handleRowClick(this)"
                         style="cursor: pointer;"
                         role="button">
 
+                        <!-- Fecha (solo en la primera fila del día o para turnos cruzados) -->
+                        <td th:text="${(esPrimeraFilaDelDia or esTurnoCruzado) ? d.fechaFormateada : ''}"></td>
 
-                        <!-- Fecha (solo en la primera fila del día) -->
-                        <td th:text="${esPrimeraFilaDelDia} ? ${d.fechaFormateada} : ''"></td>
-
-                        <!-- Día (solo en la primera fila del día) -->
-                        <td th:text="${esPrimeraFilaDelDia} ? ${d.nombreDia} : ''"></td>
+                        <!-- Día (solo en la primera fila del día o para turnos cruzados) -->
+                        <td th:text="${(esPrimeraFilaDelDia or esTurnoCruzado) ? d.nombreDia : ''}"></td>
 
                         <!-- Entrada -->
                         <td>
-    <span th:if="${d.tipoDeAusencia == null or d.tipoDeAusencia.name() == 'NO_MARCO'}">
-        <span th:text="${d.horaEntrada != null ? #temporals.format(d.horaEntrada, 'HH:mm') : '-'}"></span>
-    </span>
+            <span th:if="${d.tipoDeAusencia == null or d.tipoDeAusencia.name() == 'NO_MARCO'}">
+                <span th:text="${d.horaEntrada != null ? #temporals.format(d.horaEntrada, 'HH:mm') : '-'}"></span>
+            </span>
                             <span th:if="${d.tipoDeAusencia != null and d.tipoDeAusencia.name() != 'NO_MARCO'}">-</span>
                         </td>
 
                         <!-- Salida -->
                         <td>
-    <span th:if="${d.tipoDeAusencia == null or d.tipoDeAusencia.name() == 'NO_MARCO'}">
-        <span th:text="${d.horaSalida != null ? #temporals.format(d.horaSalida, 'HH:mm') : '-'}"></span>
-    </span>
+            <span th:if="${d.tipoDeAusencia == null or d.tipoDeAusencia.name() == 'NO_MARCO'}">
+                <span th:text="${d.horaSalida != null ? #temporals.format(d.horaSalida, 'HH:mm') : '-'}"></span>
+            </span>
                             <span th:if="${d.tipoDeAusencia != null and d.tipoDeAusencia.name() != 'NO_MARCO'}">-</span>
                         </td>
 
                         <!-- Estado -->
                         <td>
-    <span th:if="${d.marcaIncompleta}" class="badge bg-danger">
-        <span th:text="${d.tipoIncompleto == 'FALTA_ENTRADA' ? 'Incompleto' :
-                      (d.tipoIncompleto == 'FALTA_SALIDA' ? 'Incompleto' : 'Registro inválido')}"></span>
-    </span>
+            <span th:if="${d.marcaIncompleta}" class="badge bg-danger">
+                <span th:text="${d.tipoIncompleto == 'FALTA_ENTRADA' ? 'Incompleto' :
+                              (d.tipoIncompleto == 'FALTA_SALIDA' ? 'Incompleto' : 'Registro inválido')}"></span>
+            </span>
 
                             <!-- Simplifica la condición para ausencias -->
                             <span th:if="${d.ausente}" class="badge bg-danger">
-        <span th:switch="${d.tipoDeAusencia?.name()}">
-            <span th:case="'FALTA_CON_AVISO'">Ausente</span>
-            <span th:case="'FALTA_SIN_AVISO'">Ausente</span>
-            <span th:case="*">Ausente</span>
-        </span>
-    </span>
+                <span th:switch="${d.tipoDeAusencia?.name()}">
+                    <span th:case="'FALTA_CON_AVISO'">Ausente</span>
+                    <span th:case="'FALTA_SIN_AVISO'">Ausente</span>
+                    <span th:case="*">Ausente</span>
+                </span>
+            </span>
 
                             <!-- Completo -->
                             <span th:if="${!d.marcaIncompleta and !d.ausente}" class="badge bg-success">Completo</span>
@@ -163,15 +172,15 @@
                             <span th:if="${d.ausente}">-</span>
                             <span th:if="${d.marcaIncompleta}">-</span>
                             <span th:if="${!d.ausente and !d.marcaIncompleta}">
-                                <span th:switch="${d.tipoHora}">
-                                    <span th:case="'NORMAL'" class="badge bg-primary">Normal</span>
-                                    <span th:case="'EXTRA'" class="badge bg-danger">Extra</span>
-                                    <span th:case="'MIXTO'" class="badge bg-warning text-dark">Mixto</span>
-                                    <span th:case="'FIN_SEMANA'" class="badge bg-secondary">Finde/Feriado</span>
-                                    <span th:case="'FERIADO'" class="badge bg-dark">Feriado</span>
-                                    <span th:case="*" class="badge bg-light text-dark">-</span>
-                                </span>
-                            </span>
+                <span th:switch="${d.tipoHora}">
+                    <span th:case="'NORMAL'" class="badge bg-primary">Normal</span>
+                    <span th:case="'EXTRA'" class="badge bg-danger">Extra</span>
+                    <span th:case="'MIXTO'" class="badge bg-warning text-dark">Mixto</span>
+                    <span th:case="'FIN_SEMANA'" class="badge bg-secondary">Finde/Feriado</span>
+                    <span th:case="'FERIADO'" class="badge bg-dark">Feriado</span>
+                    <span th:case="*" class="badge bg-light text-dark">-</span>
+                </span>
+            </span>
                         </td>
 
                         <!-- Horas trabajadas -->
@@ -180,17 +189,17 @@
                                 <span th:text="${#numbers.formatDecimal(d.horasTrabajadas, 1, 'COMMA', 2, 'POINT') + ' h'}"></span>
                                 <span th:if="${d.tipoHora == 'MIXTO' and d.horasExtras > 0}"
                                       class="badge bg-warning text-dark ms-1 small">
-            Extra(<span th:text="${#numbers.formatDecimal(d.horasExtras, 1, 'COMMA', 1, 'POINT')}"></span>h)
-        </span>
+                    Extra(<span th:text="${#numbers.formatDecimal(d.horasExtras, 1, 'COMMA', 1, 'POINT')}"></span>h)
+                </span>
                             </div>
                             <span th:if="${d.horasTrabajadas <= 0 or (d.tipoDeAusencia != null and d.tipoDeAusencia.name() != 'NO_MARCO' and d.tipoDeAusencia.name() != 'VACACIONES' and d.tipoDeAusencia.name() != 'JUSTIFICADA')}">-</span>
                         </td>
 
                         <!-- Llegada tarde -->
                         <td>
-                            <span th:if="${d.llegoTarde}"
-                            <span th:text="${d.minutosTarde} + ' min'"></span>
-                            </span>
+            <span th:if="${d.llegoTarde}">
+                <span th:text="${d.minutosTarde} + ' min'"></span>
+            </span>
                             <span th:if="${!d.llegoTarde}">-</span>
                         </td>
 

@@ -71,7 +71,6 @@ public class ExcelService {
         }
 
 
-
         // Caso normal: dos meses del mismo año
         return "Planilla " + mesDesde + "-" + mesHasta;
     }
@@ -199,54 +198,18 @@ public class ExcelService {
             boolean esFinDeSemana = actual.getDayOfWeek() == DayOfWeek.SATURDAY || actual.getDayOfWeek() == DayOfWeek.SUNDAY;
             boolean esLaboral = !esFeriado && !esFinDeSemana;
 
-            // ---------- Verificar ausencia ----------
+            // ---------- Verificar ausencia justificada ----------
             Ausencia ausenciaDia = null;
-            boolean tieneAusencia = false;
             boolean tieneAusenciaJustificada = false;
-            boolean tieneAusenciaSinHoras = false;
 
             if (esLaboral) {
                 ausenciaDia = ausenciaService.obtenerAusenciaEmpleadoEnFecha(empleado, actual);
                 if (ausenciaDia != null) {
-                    tieneAusencia = true;
-
-                    // Definir qué tipos de ausencia son justificadas y cuáles no suman horas
-                    Ausencia.TipoDeAusencia tipoAusencia = ausenciaDia.getTipoDeAusencia();
-
-                    // Ausencias que SÍ suman horas (horario normal)
-                    boolean ausenciaConHoras = tipoAusencia == Ausencia.TipoDeAusencia.VACACIONES ||
-                            tipoAusencia == Ausencia.TipoDeAusencia.JUSTIFICADA;
-
-                    // Ausencias que NO suman horas
-                    boolean ausenciaSinHoras = tipoAusencia == Ausencia.TipoDeAusencia.FALTA_SIN_AVISO ||
-                            tipoAusencia == Ausencia.TipoDeAusencia.FALTA_CON_AVISO;
-
-                    tieneAusenciaJustificada = ausenciaConHoras;
-                    tieneAusenciaSinHoras = ausenciaSinHoras;
+                    // Considerar como justificadas: VACACIONES, JUSTIFICADA, LICENCIA, etc. (todo excepto INJUSTIFICADA y NO_MARCO)
+                    tieneAusenciaJustificada = (ausenciaDia.getTipoDeAusencia() != Ausencia.TipoDeAusencia.FALTA_SIN_AVISO
+                            && ausenciaDia.getTipoDeAusencia() != Ausencia.TipoDeAusencia.NO_MARCO);
                 }
             }
-
-            // ---------- Configuración de horario activo ----------
-            LocalTime horaEntradaActiva = empleado.getHoraEntrada();
-            LocalTime horaSalidaActiva = empleado.getHoraSalida();
-            boolean esSegundoHorario = false;
-
-            if (empleado.getHoraEntrada2() != null && empleado.getHoraSalida2() != null && !marcasDelDia.isEmpty()) {
-                RegistroAsistencia primeraEntrada = marcasDelDia.get(0);
-                long diffHorario1 = Math.abs(Duration.between(primeraEntrada.getHora(), empleado.getHoraEntrada()).toMinutes());
-                long diffHorario2 = Math.abs(Duration.between(primeraEntrada.getHora(), empleado.getHoraEntrada2()).toMinutes());
-                if (diffHorario2 < diffHorario1) {
-                    horaEntradaActiva = empleado.getHoraEntrada2();
-                    horaSalidaActiva = empleado.getHoraSalida2();
-                    esSegundoHorario = true;
-                }
-            }
-
-            int flexMinutos = Optional.ofNullable(empleado.getFlexMinutos()).orElse(0);
-            LocalTime horaEntradaMaxima = horaEntradaActiva.plusMinutes(flexMinutos);
-            LocalTime horaEntradaMinima = horaEntradaActiva.minusMinutes(flexMinutos);
-            LocalTime horaSalidaMinima = horaSalidaActiva.minusMinutes(flexMinutos);
-            LocalTime horaSalidaMaxima = horaSalidaActiva.plusMinutes(flexMinutos);
 
             boolean tieneHorasJustificadas = false;
             boolean tieneHorasReales = false;
@@ -292,6 +255,28 @@ public class ExcelService {
                 detalle.add(dtoIncompleto);
             }
 
+            // ---------- Configuración de horario activo ----------
+            LocalTime horaEntradaActiva = empleado.getHoraEntrada();
+            LocalTime horaSalidaActiva = empleado.getHoraSalida();
+            boolean esSegundoHorario = false;
+
+            if (empleado.getHoraEntrada2() != null && empleado.getHoraSalida2() != null && !marcasDelDia.isEmpty()) {
+                RegistroAsistencia primeraEntrada = marcasDelDia.get(0);
+                long diffHorario1 = Math.abs(Duration.between(primeraEntrada.getHora(), empleado.getHoraEntrada()).toMinutes());
+                long diffHorario2 = Math.abs(Duration.between(primeraEntrada.getHora(), empleado.getHoraEntrada2()).toMinutes());
+                if (diffHorario2 < diffHorario1) {
+                    horaEntradaActiva = empleado.getHoraEntrada2();
+                    horaSalidaActiva = empleado.getHoraSalida2();
+                    esSegundoHorario = true;
+                }
+            }
+
+            int flexMinutos = Optional.ofNullable(empleado.getFlexMinutos()).orElse(0);
+            LocalTime horaEntradaMaxima = horaEntradaActiva.plusMinutes(flexMinutos);
+            LocalTime horaEntradaMinima = horaEntradaActiva.minusMinutes(flexMinutos);
+            LocalTime horaSalidaMinima = horaSalidaActiva.minusMinutes(flexMinutos);
+            LocalTime horaSalidaMaxima = horaSalidaActiva.plusMinutes(flexMinutos);
+
             // ---------- Procesamiento de pares de marcas ----------
             for (int i = 0; i + 1 < marcasDelDia.size(); i += 2) {
                 RegistroAsistencia entrada = marcasDelDia.get(i);
@@ -332,28 +317,58 @@ public class ExcelService {
                         horasExtras = horas;
                         totalExtras += horasExtras;
                     } else {
-                        // PARA PRIMER PAR: calcular horas normales y extras normalmente
-                        LocalTime inicioHorasNormales = entrada.getHora().isBefore(horaEntradaMinima) ? horaEntradaMinima : entrada.getHora();
-                        LocalTime finHorasNormales = salida.getHora().isAfter(horaSalidaMaxima) ? horaSalidaMaxima : salida.getHora();
+                        // PARA PRIMER PAR: calcular horas normales y extras por separado
+                        LocalTime inicio = entrada.getHora();
+                        LocalTime fin = salida.getHora();
 
-                        if (inicioHorasNormales.isBefore(finHorasNormales)) {
+                        // Horas normales: tiempo dentro del horario laboral
+                        LocalTime inicioHorasNormales = inicio.isBefore(horaEntradaMinima) ? horaEntradaMinima : inicio;
+                        LocalTime finHorasNormales = fin.isAfter(horaSalidaMaxima) ? horaSalidaMaxima : fin;
+
+                        // Solo calcular horas normales si hay superposición con horario laboral
+                        if (inicioHorasNormales.isBefore(finHorasNormales) && !inicioHorasNormales.equals(finHorasNormales)) {
                             horasNormales = Duration.between(inicioHorasNormales, finHorasNormales).toMinutes() / 60.0;
                         }
 
-                        if (entrada.getHora().isBefore(horaEntradaMinima)) {
-                            horasExtras += Duration.between(entrada.getHora(), horaEntradaMinima).toMinutes() / 60.0;
-                        }
-                        if (salida.getHora().isAfter(horaSalidaMaxima)) {
-                            horasExtras += Duration.between(horaSalidaMaxima, salida.getHora()).toMinutes() / 60.0;
+                        // Horas extras: tiempo fuera del horario laboral
+                        // Antes del horario laboral
+                        if (inicio.isBefore(horaEntradaMinima)) {
+                            LocalTime finExtra = inicioHorasNormales.isBefore(horaEntradaMinima) ? horaEntradaMinima : inicioHorasNormales;
+                            horasExtras += Duration.between(inicio, finExtra).toMinutes() / 60.0;
                         }
 
-                        tipoHora = (horasExtras > 0 ? "MIXTO" : "NORMAL");
+                        // Después del horario laboral
+                        if (fin.isAfter(horaSalidaMaxima)) {
+                            LocalTime inicioExtra = finHorasNormales.isAfter(horaSalidaMaxima) ? horaSalidaMaxima : finHorasNormales;
+                            horasExtras += Duration.between(inicioExtra, fin).toMinutes() / 60.0;
+                        }
+
+                        // Validación: asegurar que la suma coincida con el total
+                        double horasCalculadas = horasNormales + horasExtras;
+                        double diferencia = Math.abs(horasCalculadas - horas);
+
+                        if (diferencia > 0.01) { // Tolerancia por redondeo
+                            // Ajustar las horas extras para que coincida
+                            horasExtras = Math.max(0, horas - horasNormales);
+                        }
+
+                        // Determinar tipo de hora
+                        if (horasExtras > 0 && horasNormales > 0) {
+                            tipoHora = "MIXTO";
+                        } else if (horasExtras > 0) {
+                            tipoHora = "EXTRA";
+                        } else {
+                            tipoHora = "NORMAL";
+                        }
+
                         totalNormales += horasNormales;
                         totalExtras += horasExtras;
                     }
                 }
 
-                totalHoras += (horasNormales + horasExtras + horasFinde);
+                // CORRECCIÓN: Solo sumar horas normales al total general
+                // Las horas extras ya se contabilizan por separado
+                totalHoras += horas;
 
                 if (esJustificada) {
                     tieneHorasJustificadas = true;
@@ -369,7 +384,7 @@ public class ExcelService {
                 dto.setHoraEntrada(entrada.getHora());
                 dto.setHoraSalida(salida.getHora());
                 dto.setTipoHora(tipoHora);
-                dto.setHorasTrabajadas(horasNormales + horasExtras + horasFinde);
+                dto.setHorasTrabajadas(horas); // ← USAR EL TOTAL REAL DE HORAS, NO LA SUMA
                 dto.setMarcaIncompleta(false);
                 dto.setAusente(false);
                 dto.setLlegoTarde(llegoTarde);
@@ -379,12 +394,14 @@ public class ExcelService {
                 dto.setJustificada(esJustificada);
                 dto.setSegundoHorario(esSegundoHorario);
                 dto.setHorasExtras(horasExtras);
+                dto.setHorasNormales(horasNormales); // ← AGREGAR ESTE CAMPO SI NO EXISTE
                 dto.setFotoEntradaBase64(fotoEntradaBase64);
                 dto.setFotoSalidaBase64(fotoSalidaBase64);
 
-                // Si hay ausencia, mostrar el tipo
+                // Si hay ausencia (justificada o no), marcamos el DTO para mostrar el tipo
                 if (ausenciaDia != null) {
                     dto.setTipoDeAusencia(ausenciaDia.getTipoDeAusencia());
+                    dto.setJustificada(tieneAusenciaJustificada);
                 }
 
                 detalle.add(dto);
@@ -398,116 +415,52 @@ public class ExcelService {
                 dto.setNombreCompleto(empleado.getNombre() + " " + empleado.getApellido());
                 dto.setFechaFormateada(fechaFormateada);
                 dto.setNombreDia(nombreDia);
+                dto.setHorasTrabajadas(0);
                 dto.setEsFeriado(esFeriado);
                 dto.setEsFinDeSemana(esFinDeSemana);
 
-                // DEBUG COMPLETO - Verificar condiciones antes del switch
-                System.out.println("=== DEBUG DÍA SIN MARCAS ===");
-                System.out.println("Fecha: " + fechaFormateada);
-                System.out.println("esLaboral: " + esLaboral);
-                System.out.println("ausenciaDia: " + ausenciaDia);
-                System.out.println("TipoAusencia: " + (ausenciaDia != null ? ausenciaDia.getTipoDeAusencia() : "NULL"));
-                System.out.println("Condición (esLaboral && ausenciaDia != null): " + (esLaboral && ausenciaDia != null));
+                if (esLaboral) {
+                    if (tieneAusenciaJustificada) {
+                        // Día con ausencia justificada (vacaciones, licencia, etc.) - considerar como horario normal
+                        dto.setTipoHora("NORMAL");
+                        dto.setAusente(false); // No es ausente porque está justificado
+                        dto.setJustificada(true);
+                        dto.setTipoDeAusencia(ausenciaDia.getTipoDeAusencia()); // ← MOSTRAR EL TIPO DE AUSENCIA
 
-                if (esLaboral && ausenciaDia != null) {
-                    dto.setTipoDeAusencia(ausenciaDia.getTipoDeAusencia());
-
-                    // DEBUG - Antes del switch
-                    System.out.println(">>> Entrando al switch con tipo: " + ausenciaDia.getTipoDeAusencia());
-
-                    switch (ausenciaDia.getTipoDeAusencia()) {
-                        case NO_MARCO:
-                            System.out.println(">>> EJECUTANDO CASE NO_MARCO");
-                            // NO_MARCO muestra horarios Y SÍ suma horas
-                            dto.setTipoHora("NORMAL");
-                            dto.setAusente(false);
-                            dto.setJustificada(true);
-                            dto.setHoraEntrada(horaEntradaActiva);    // ← SÍ mostrar horarios
-                            dto.setHoraSalida(horaSalidaActiva);      // ← SÍ mostrar horarios
-
-                            // SÍ sumar horas normales
-                            double horasTrabajadasNormales = Duration.between(horaEntradaActiva, horaSalidaActiva).toMinutes() / 60.0;
-                            dto.setHorasTrabajadas(horasTrabajadasNormales);
-                            totalNormales += horasTrabajadasNormales;
-                            totalHoras += horasTrabajadasNormales;
-                            break;
-
-                        case VACACIONES:
-                        case JUSTIFICADA:
-                            System.out.println(">>> EJECUTANDO CASE VACACIONES/JUSTIFICADA");
-                            // Ausencias que se pagan completas - NO mostrar horarios pero SÍ sumar horas
-                            dto.setTipoHora("NORMAL");
-                            dto.setAusente(false);
-                            dto.setJustificada(true);
-                            dto.setHoraEntrada(null);  // NO mostrar horarios
-                            dto.setHoraSalida(null);   // NO mostrar horarios
-
-                            horasTrabajadasNormales = Duration.between(horaEntradaActiva, horaSalidaActiva).toMinutes() / 60.0;
-                            dto.setHorasTrabajadas(horasTrabajadasNormales);
-                            totalNormales += horasTrabajadasNormales;
-                            totalHoras += horasTrabajadasNormales;
-                            break;
-
-                        case FALTA_CON_AVISO:
-                            System.out.println(">>> EJECUTANDO CASE FALTA_CON_AVISO");
-                            // Faltas reales - no mostrar horarios y no sumar horas
-                            dto.setTipoHora("AUSENTE");
-                            dto.setAusente(true);
-                            dto.setJustificada(false);
-                            dto.setHoraEntrada(null);  // NO mostrar horarios
-                            dto.setHoraSalida(null);   // NO mostrar horarios
-                            dto.setHorasTrabajadas(0);
-                            totalAusencias++;
-
-                            // DEBUG TEMPORAL
-                            System.out.println("*** DEBUG FALTA_CON_AVISO - ausente: " + dto.isAusente() +
-                                    ", tipo: " + dto.getTipoDeAusencia());
-                            break;
-
-                        default:
-                            System.out.println(">>> EJECUTANDO CASE DEFAULT - Tipo: " + ausenciaDia.getTipoDeAusencia());
-                            // Para cualquier otro tipo no especificado
-                            dto.setTipoHora("AUSENTE");
-                            dto.setAusente(true);
-                            dto.setJustificada(false);
-                            dto.setHoraEntrada(null);  // NO mostrar horarios
-                            dto.setHoraSalida(null);   // NO mostrar horarios
-                            dto.setHorasTrabajadas(0);
-                            totalAusencias++;
+                        // Calcular horas normales como si hubiera trabajado el horario completo
+                        double horasTrabajadasNormales = Duration.between(horaEntradaActiva, horaSalidaActiva).toMinutes() / 60.0;
+                        dto.setHorasTrabajadas(horasTrabajadasNormales);
+                        totalNormales += horasTrabajadasNormales;
+                        totalHoras += horasTrabajadasNormales;
+                    } else {
+                        // Día sin marcas y sin ausencia justificada - es ausencia real
+                        dto.setTipoHora("AUSENTE");
+                        dto.setAusente(true);
+                        dto.setJustificada(false);
+                        dto.setTipoDeAusencia(Ausencia.TipoDeAusencia.FALTA_SIN_AVISO);
+                        totalAusencias++;
                     }
-
-                    // DEBUG después del switch
-                    System.out.println(">>> Después del switch - ausente: " + dto.isAusente() +
-                            ", tipoHora: " + dto.getTipoHora());
-
-                } else if (esLaboral) {
-                    System.out.println(">>> Cayendo en else if (esLaboral) - FALTA_SIN_AVISO automática");
-                    // Día laboral sin ausencia registrada - considerar como falta sin aviso
-                    dto.setTipoHora("AUSENTE");
-                    dto.setAusente(true);
-                    dto.setJustificada(false);
-                    dto.setTipoDeAusencia(Ausencia.TipoDeAusencia.FALTA_SIN_AVISO);
-                    dto.setHoraEntrada(null);  // NO mostrar horarios
-                    dto.setHoraSalida(null);   // NO mostrar horarios
-                    dto.setHorasTrabajadas(0);
-                    totalAusencias++;
                 } else {
-                    System.out.println(">>> Cayendo en else (no laboral)");
-                    // Día no laboral (fin de semana o feriado)
                     dto.setTipoHora(esFeriado ? "FERIADO" : "FIN_SEMANA");
                     dto.setAusente(false);
                     dto.setJustificada(false);
                     dto.setTipoDeAusencia(null);
-                    dto.setHoraEntrada(null);  // NO mostrar horarios
-                    dto.setHoraSalida(null);   // NO mostrar horarios
-                    dto.setHorasTrabajadas(0);
+                }
+
+                // SIEMPRE establecer el tipo de ausencia si existe, incluso para días justificados
+                if (ausenciaDia != null) {
+                    dto.setTipoDeAusencia(ausenciaDia.getTipoDeAusencia()); // ← ESTA LÍNEA ES CLAVE
                 }
 
                 detalle.add(dto);
             }
 
             boolean trabajoEseDia = tieneHorasReales || tieneHorasJustificadas || !marcasDelDia.isEmpty() || tieneAusenciaJustificada;
-            if (trabajoEseDia && !tieneMarcasIncompletas) {
+            if (trabajoEseDia
+                    && !tieneMarcasIncompletas
+                    && (ausenciaDia == null
+                    || (ausenciaDia.getTipoDeAusencia() != Ausencia.TipoDeAusencia.FALTA_SIN_AVISO
+                    && ausenciaDia.getTipoDeAusencia() != Ausencia.TipoDeAusencia.FALTA_CON_AVISO))) {
                 diasTrabajados++;
             }
 
@@ -515,26 +468,25 @@ public class ExcelService {
         }
 
         // ---------- Cálculo de presentismo ----------
-        boolean tieneInasistenciasQueAfectanPresentismo = detalle.stream().anyMatch(dto ->
-                (dto.isAusente() && dto.getTipoDeAusencia() != null &&
-                        dto.getTipoDeAusencia() != Ausencia.TipoDeAusencia.NO_MARCO) ||
-                        (dto.getTipoDeAusencia() != null &&
-                                dto.getTipoDeAusencia() != Ausencia.TipoDeAusencia.VACACIONES &&
-                                dto.getTipoDeAusencia() != Ausencia.TipoDeAusencia.NO_MARCO &&
-                                !dto.isAusente()));
+        boolean tieneAusenciaQueQuitaPresentismo = detalle.stream().anyMatch(dto -> {
+            Ausencia.TipoDeAusencia tipo = dto.getTipoDeAusencia();
+            // Si existe una ausencia y no es vacaciones ni no_marco, quita presentismo
+            return tipo != null
+                    && tipo != Ausencia.TipoDeAusencia.VACACIONES
+                    && tipo != Ausencia.TipoDeAusencia.NO_MARCO;
+        });
 
-        boolean tieneRetardosGraves = detalle.stream().anyMatch(dto ->
-                dto.isLlegoTarde() &&
-                        !dto.isEsFeriado() &&
-                        !dto.isEsFinDeSemana() &&
-                        dto.getMinutosTarde() > 10);
+        int totalMinutosTarde = detalle.stream().mapToInt(ResumenEmpleadoDTO::getMinutosTarde).sum();
 
-        boolean presentismo = !(tieneInasistenciasQueAfectanPresentismo || tieneRetardosGraves);
+// Presentismo: solo si NO tiene ausencias (excepto vacaciones o no_marco) y no supera los 30 minutos tarde
+        boolean presentismo = !(tieneAusenciaQueQuitaPresentismo || totalMinutosTarde > 30);
 
         detalle.forEach(dto -> dto.setPresentismo(presentismo));
 
+
         return detalle;
     }
+
 
     public Map<String, Object> generarDetalleEmpleadoView(String dni, LocalDate desde, LocalDate hasta) {
         Empleado empleado = empleadoRepo.findByDni(dni).orElseThrow();
@@ -549,43 +501,58 @@ public class ExcelService {
         resultado.put("hasta", hasta);
         resultado.put("dniSeleccionado", dni);
 
-        // Cálculo de totales BASADO EN LO QUE YA CALCULÓ procesarAsistenciasEmpleado
         // Filtramos registros válidos para los cálculos
         List<ResumenEmpleadoDTO> registrosValidos = detalle.stream()
-                .filter(d -> !d.isMarcaIncompleta())
+                .filter(d -> !d.isMarcaIncompleta() &&
+                        !"INVALIDO".equals(d.getTipoHora()))
                 .toList();
 
-        // Usamos directamente los datos del DTO sin recálculos complejos
+        // Cálculo de totales CORREGIDO
         double totalHoras = registrosValidos.stream()
                 .mapToDouble(ResumenEmpleadoDTO::getHorasTrabajadas)
                 .sum();
 
-        // Para horas normales: incluir VACACIONES, JUSTIFICADA y días normales sin ausencia
+        // CORRECCIÓN: Cálculo simplificado y correcto de horas normales
         double totalNormales = registrosValidos.stream()
-                .filter(d -> ("NORMAL".equals(d.getTipoHora()) ||
-                        d.getTipoDeAusencia() == Ausencia.TipoDeAusencia.VACACIONES ||
-                        d.getTipoDeAusencia() == Ausencia.TipoDeAusencia.JUSTIFICADA) &&
-                        !d.isAusente())  // Solo los que NO están marcados como ausentes
-                .mapToDouble(ResumenEmpleadoDTO::getHorasTrabajadas)
+                .mapToDouble(d -> {
+                    switch (d.getTipoHora()) {
+                        case "NORMAL":
+                            return d.getHorasTrabajadas();
+                        case "MIXTO":
+                            // Para registros mixtos, usar horasNormales directamente
+                            // O calcular como: horas trabajadas - horas extras
+                            return d.getHorasTrabajadas() - d.getHorasExtras();
+                        case "EXTRA":
+                        case "FERIADO":
+                        case "FIN_SEMANA":
+                        default:
+                            return 0.0;
+                    }
+                })
                 .sum();
 
-        // Para horas extras: usar el campo horasExtras que ya viene calculado
+        // CORRECCIÓN: Simplificar cálculo de horas extras
         double totalExtras = registrosValidos.stream()
                 .mapToDouble(ResumenEmpleadoDTO::getHorasExtras)
                 .sum();
 
-        // Para finde/feriado: usar el tipo de hora
         double totalFinde = registrosValidos.stream()
                 .filter(d -> "FIN_SEMANA".equals(d.getTipoHora()) || "FERIADO".equals(d.getTipoHora()))
                 .mapToDouble(ResumenEmpleadoDTO::getHorasTrabajadas)
                 .sum();
 
-        // Para ausencias: contar solo FALTA_CON_AVISO y FALTA_SIN_AVISO
-        long totalAusencias = detalle.stream()
-                .filter(d -> d.isAusente() &&
-                        (d.getTipoDeAusencia() == Ausencia.TipoDeAusencia.FALTA_CON_AVISO ||
-                                d.getTipoDeAusencia() == Ausencia.TipoDeAusencia.FALTA_SIN_AVISO))
-                .count();
+        // Resto del código igual...
+        List<ResumenEmpleadoDTO> ausencias = detalle.stream()
+                .filter(d -> {
+                    boolean esAusente = d.isAusente();
+                    boolean noEsFeriado = !d.isEsFeriado();
+                    boolean noEsFinDeSemana = !d.isEsFinDeSemana();
+                    boolean esInjustificada = d.getTipoDeAusencia() == Ausencia.TipoDeAusencia.FALTA_SIN_AVISO;
+                    return esAusente && noEsFeriado && noEsFinDeSemana && esInjustificada;
+                })
+                .toList();
+
+        long totalAusencias = ausencias.size();
 
         long totalLlegadasTarde = detalle.stream()
                 .filter(d -> d.isLlegoTarde() &&
@@ -593,23 +560,11 @@ public class ExcelService {
                         !d.isEsFinDeSemana())
                 .count();
 
-        // Para días trabajados: considerar días con marcas reales O ausencias justificadas (VACACIONES/JUSTIFICADA)
         int diasTrabajados = (int) detalle.stream()
                 .filter(d -> {
-                    boolean tieneHorasTrabajadas = d.getHorasTrabajadas() > 0;
-                    boolean esAusenciaJustificada = d.getTipoDeAusencia() == Ausencia.TipoDeAusencia.VACACIONES ||
-                            d.getTipoDeAusencia() == Ausencia.TipoDeAusencia.JUSTIFICADA;
-                    boolean esFaltaInjustificada = d.isAusente() &&
-                            d.getTipoDeAusencia() != Ausencia.TipoDeAusencia.VACACIONES &&
-                            d.getTipoDeAusencia() != Ausencia.TipoDeAusencia.JUSTIFICADA;
-
-                    boolean esDiaValido = !d.isMarcaIncompleta() &&
-                            !d.isEsFeriado() &&
-                            !d.isEsFinDeSemana();
-
-                    return (tieneHorasTrabajadas || esAusenciaJustificada) &&
-                            esDiaValido &&
-                            !esFaltaInjustificada;
+                    boolean tieneMarcas = d.getHoraEntrada() != null || d.getHoraSalida() != null;
+                    boolean esValido = !d.isMarcaIncompleta() && !"INVALIDO".equals(d.getTipoHora());
+                    return tieneMarcas && esValido;
                 })
                 .map(ResumenEmpleadoDTO::getFechaFormateada)
                 .distinct()
@@ -635,7 +590,9 @@ public class ExcelService {
 
         return resultado;
     }
+
     public List<ResumenAsistenciasDTO> generarResumenTotalesPorLog(Long logId, Empleado.TipoContrato tipoContrato) {
+
         LogCargaAsistencia log = logCargaRepository.findById(logId)
                 .orElseThrow(() -> new RuntimeException("Log no encontrado"));
 
@@ -763,7 +720,6 @@ public class ExcelService {
     }
 
 
-
     private String convertToBase64(byte[] imageBytes) {
         if (imageBytes != null && imageBytes.length > 0) {
             return Base64.getEncoder().encodeToString(imageBytes);
@@ -771,4 +727,3 @@ public class ExcelService {
         return null;
     }
 }
-

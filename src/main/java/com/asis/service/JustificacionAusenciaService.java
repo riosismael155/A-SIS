@@ -45,8 +45,16 @@ public class JustificacionAusenciaService {
             boolean esFeriado = feriadoService.esFeriado(actual);
             boolean esLaboral = !esFinde && !esFeriado;
 
-            // Solo generar registros si es día laboral
-            boolean generarRegistros = esLaboral;
+            // Determinar si generar registros según el tipo de ausencia
+            boolean generarRegistros;
+
+            if (tipoAusencia == Ausencia.TipoDeAusencia.NO_MARCO) {
+                // Para NO_MARCO, generar registros en TODOS los días (laborales y no laborales)
+                generarRegistros = true;
+            } else {
+                // Para otros tipos de ausencia, solo generar en días laborales
+                generarRegistros = esLaboral;
+            }
 
             if (generarRegistros) {
                 // Verificar si ya existen registros para este empleado y fecha
@@ -88,7 +96,6 @@ public class JustificacionAusenciaService {
         // Guardar la justificación, se persisten los registros por cascade
         justificacionRepo.save(justificacion);
     }
-
 
     public List<Ausencia> listarJustificaciones() {
         return justificacionRepo.findAll();

@@ -5,6 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 
 @Data
@@ -62,6 +63,9 @@ public class ResumenEmpleadoDTO {
     private String fotoEntradaBase64;
     private String fotoSalidaBase64;
     private boolean presentismo;
+    private LocalDateTime fechaHoraEntrada;
+    private LocalDateTime fechaHoraSalida;
+
 
 
 
@@ -136,4 +140,7 @@ public class ResumenEmpleadoDTO {
         }
         return 0;
     }
+
+
+
 }

@@ -3,7 +3,22 @@
 <head th:replace="fragments/header :: head('PLANILLA MENSUAL')">
     <link rel="icon" th:href="@{/favicon.ico}" type="image/x-icon"/>
 
+
 </head>
+<style>/* Cuadritos de leyenda */
+    .legend-box {
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    border-radius: 3px;
+    border: 1px solid rgba(0,0,0,0.1);
+    }
+
+    /* Ajuste visual en modo oscuro (opcional si usás tema oscuro) */
+    .table-dark .legend-box {
+    border-color: rgba(255,255,255,0.3);
+    }
+</style>
 <body>
 
 <div th:replace="fragments/header :: body"></div>
@@ -68,6 +83,32 @@
                     </div>
                 </div>
             </div>
+            <div class="row mb-3 align-items-center justify-content-between">
+                <div class="col-md-8 col-sm-12">
+                    <div class="d-flex flex-wrap align-items-center gap-3 small">
+                        <div class="d-flex align-items-center">
+                            <span class="legend-box bg-success me-2"></span>
+                            <span>Sin marcas incompletas</span>
+                        </div>
+                        <div class="d-flex align-items-center">
+                            <span class="legend-box bg-danger me-2"></span>
+                            <span>Con marcas incompletas</span>
+                        </div>
+                        <div class="d-flex align-items-center">
+                            <span class="legend-box bg-warning me-2"></span>
+                            <span>Con ausencias injustificadas</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-4 col-sm-12 d-flex justify-content-md-end justify-content-start mt-2 mt-md-0">
+                    <button type="button" class="btn btn-outline-secondary" onclick="printTable()">
+                        <i class="bi bi-printer me-2"></i> Imprimir
+                    </button>
+                </div>
+            </div>
+
+
             <!-- Tabla -->
             <div class="table-responsive" style="max-height: 550px; overflow-y: auto;">
                 <table class="table table-bordered table-hover table-excel">
@@ -80,7 +121,7 @@
                         <th onclick="sortTable(4)">Extras <i class="bi bi-funnel sort-icon"></i></th>
                         <th onclick="sortTable(5)">Finde/Feriado <i class="bi bi-funnel sort-icon"></i></th>
                         <th onclick="sortTable(6)">Presentismo <i class="bi bi-funnel sort-icon"></i></th>
-                        <th onclick="sortTable(7)">Ausencias Injustificadas <i class="bi bi-funnel sort-icon"></i></th>
+                        <th onclick="sortTable(7)">Faltas sin aviso<i class="bi bi-funnel sort-icon"></i></th>
 
                     </tr>
                     </thead>
@@ -193,6 +234,119 @@
             }
         }
     };
+</script>
+<script>
+    function printTable() {
+        const bloque = document.querySelector(".bloque-elevado");
+        if (!bloque) return;
+
+        const tabla = bloque.querySelector(".table");
+        if (!tabla) return;
+
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write(`
+            <html>
+            <head>
+                <title>Resumen de Asistencia Mensual</title>
+                <style>
+                    @page {
+                        size: A4 portrait;
+                        margin: 10mm;
+                    }
+                    html, body {
+                        width: 100%;
+                        height: 100%;
+                        margin: 0;
+                        padding: 0;
+                        font-family: Arial, sans-serif;
+                        font-size: 10px;
+                    }
+                    .print-container {
+                        width: 100%;
+                        overflow: visible;
+                    }
+                    h4 {
+                        text-align: center;
+                        margin: 0 0 15px 0;
+                        font-size: 14px;
+                    }
+                    table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        font-size: 9px;
+                        page-break-inside: auto;
+                    }
+                    thead {
+                        display: table-header-group;
+                    }
+                    tbody {
+                        display: table-row-group;
+                    }
+                    tr {
+                        page-break-inside: avoid;
+                        page-break-after: auto;
+                    }
+                    th, td {
+                        border: 1px solid #000;
+                        padding: 3px 4px;
+                        text-align: left;
+                        vertical-align: middle;
+                        word-break: break-word;
+                    }
+                    th {
+                        background: #333 !important;
+                        color: white !important;
+                        font-weight: bold;
+                    }
+                    .table-success { background-color: #d1e7dd !important; }
+                    .table-warning { background-color: #fff3cd !important; }
+                    .table-danger  { background-color: #f8d7da !important; }
+
+                    /* Ocultar scrollbars y asegurar visibilidad completa */
+                    body::-webkit-scrollbar {
+                        display: none;
+                    }
+                    body {
+                        -ms-overflow-style: none;
+                        scrollbar-width: none;
+                        overflow: visible;
+                    }
+
+                    @media print {
+                        * {
+                            -webkit-print-color-adjust: exact;
+                            print-color-adjust: exact;
+                        }
+                        body {
+                            margin: 0;
+                            padding: 0;
+                            overflow: visible !important;
+                        }
+                        .print-container {
+                            transform: none;
+                            width: 100%;
+                        }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="print-container">
+                    <h4>Resumen de Asistencia Mensual</h4>
+                    ${tabla.outerHTML}
+                </div>
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
+
+        printWindow.onload = () => {
+            printWindow.focus();
+            // Pequeño delay para asegurar que todo se cargue
+            setTimeout(() => {
+                printWindow.print();
+            }, 500);
+        };
+    }
 </script>
 </body>
 </html>

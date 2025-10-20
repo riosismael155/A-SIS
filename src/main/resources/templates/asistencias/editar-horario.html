@@ -38,8 +38,8 @@
                 <input type="hidden" th:field="*{fecha}" />
 
                 <div id="horariosContainer">
-                    <!-- Iterar sobre el máximo entre entradas y salidas -->
-                    <div th:each="i : ${#numbers.sequence(0, T(java.lang.Math).max(#lists.size(edicionDTO.entradas), #lists.size(edicionDTO.salidas)) - 1)}"
+                    <div th:if="${#lists.size(edicionDTO.entradas) > 0 or #lists.size(edicionDTO.salidas) > 0}"
+                         th:each="i : ${#numbers.sequence(0, T(java.lang.Math).max(#lists.size(edicionDTO.entradas), #lists.size(edicionDTO.salidas)) - 1)}"
                          class="card mb-4 horario-item">
                         <div class="card-header bg-light">
                             <h5 class="mb-0" th:text="${i == 0 ? 'Horario Principal' : 'Horario Secundario'}"></h5>
@@ -52,7 +52,6 @@
                                            th:value="${i < #lists.size(edicionDTO.entradas) ? edicionDTO.entradas[i] : ''}"
                                            th:name="entradas[__${i}__]" />
                                 </div>
-
                                 <div class="col-md-6">
                                     <label class="form-label">Hora de Salida</label>
                                     <input type="time" class="form-control"
@@ -71,10 +70,12 @@
                     </button>
                 </div>
 
+                <!-- Motivo del cambio -->
                 <div class="mb-4" th:if="${tieneRegistros}">
                     <label for="motivoCambio" class="form-label">Motivo del cambio</label>
                     <textarea class="form-control" id="motivoCambio" th:field="*{motivoCambio}" rows="3" required></textarea>
                 </div>
+
                 <div class="d-flex justify-content-between" th:if="${tieneRegistros}">
                     <button type="submit" class="btn-action">
                         <i class="bi bi-save me-1"></i> Guardar Cambios
