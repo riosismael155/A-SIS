@@ -25,6 +25,7 @@ public interface RegistroRepository extends JpaRepository<RegistroAsistencia, Lo
     List<RegistroAsistencia> findByEmpleadoDniAndFecha(String dni, LocalDate fecha);
 
     List<RegistroAsistencia> findByEmpleadoAndFecha(Empleado empleado, LocalDate fecha);
+
     @Modifying
     @Transactional
     @Query("DELETE FROM RegistroAsistencia r WHERE r.justificacion IS NULL AND r.fecha BETWEEN :desde AND :hasta")
@@ -33,6 +34,8 @@ public interface RegistroRepository extends JpaRepository<RegistroAsistencia, Lo
 
     @Query("SELECT MAX(r.ordenDia) FROM RegistroAsistencia r WHERE r.empleado.id = :empleadoId AND r.fecha = :fecha")
     Integer findMaxOrdenDiaByEmpleadoAndFecha(@Param("empleadoId") Long empleadoId, @Param("fecha") LocalDate fecha);
+
+    List<RegistroAsistencia> findByFechaBetween(LocalDate desde, LocalDate hasta);
 
 }
 

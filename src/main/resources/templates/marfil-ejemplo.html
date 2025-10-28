@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Metalúrgica Marfil</title>
+    <style>
+        /* ====== PALETA ======
+          Rojo principal: #C8102E
+          Vino oscuro:    #7A0019
+          Gris oscuro:    #2C2C2C
+          Gris claro:     #F5F5F5
+          Blanco:         #FFFFFF
+        ====================== */
+
+        :root {
+          --rojo: #C8102E;
+          --vino: #7A0019;
+          --gris-oscuro: #2C2C2C;
+          --gris-claro: #F5F5F5;
+          --blanco: #FFFFFF;
+        }
+
+        body {
+          margin: 0;
+          font-family: "Poppins", sans-serif;
+          background-color: var(--gris-claro);
+          color: var(--gris-oscuro);
+          line-height: 1.6;
+        }
+
+        /* Header */
+        header {
+          background-color: var(--blanco);
+          box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 1rem 3rem;
+          position: sticky;
+          top: 0;
+          z-index: 100;
+        }
+
+        header img {
+          height: 45px;
+        }
+
+        nav ul {
+          list-style: none;
+          display: flex;
+          gap: 2rem;
+          margin: 0;
+          padding: 0;
+        }
+
+        nav a {
+          text-decoration: none;
+          color: var(--gris-oscuro);
+          font-weight: 500;
+          transition: color 0.3s ease;
+        }
+
+        nav a:hover {
+          color: var(--rojo);
+        }
+
+        /* Hero */
+        .hero {
+          background-color: var(--blanco);
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 5rem 10%;
+          flex-wrap: wrap;
+        }
+
+        .hero-text {
+          max-width: 500px;
+        }
+
+        .hero h1 {
+          font-size: 2.8rem;
+          color: var(--gris-oscuro);
+          margin-bottom: 1rem;
+        }
+
+        .hero p {
+          font-size: 1.1rem;
+          margin-bottom: 2rem;
+        }
+
+        .btn {
+          background-color: var(--rojo);
+          color: var(--blanco);
+          padding: 0.9rem 2rem;
+          border: none;
+          border-radius: 6px;
+          font-size: 1rem;
+          cursor: pointer;
+          transition: background-color 0.3s ease;
+        }
+
+        .btn:hover {
+          background-color: var(--vino);
+        }
+
+        .hero-image {
+          flex: 1;
+          text-align: center;
+        }
+
+        .hero-image img {
+          max-width: 400px;
+          width: 100%;
+          border-radius: 8px;
+        }
+
+        /* Sección */
+        section {
+          padding: 4rem 10%;
+          text-align: center;
+        }
+
+        section h2 {
+          color: var(--gris-oscuro);
+          margin-bottom: 2rem;
+          font-size: 2rem;
+        }
+
+        .cards {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+          gap: 2rem;
+        }
+
+        .card {
+          background-color: var(--blanco);
+          padding: 2rem;
+          border-radius: 8px;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+          transition: transform 0.3s ease;
+        }
+
+        .card:hover {
+          transform: translateY(-5px);
+        }
+
+        /* Footer */
+        footer {
+          background-color: var(--vino);
+          color: var(--blanco);
+          text-align: center;
+          padding: 2rem;
+          font-size: 0.9rem;
+          margin-top: 3rem;
+        }
+
+        @media (max-width: 768px) {
+          .hero {
+            flex-direction: column;
+            text-align: center;
+          }
+          .hero-text {
+            margin-bottom: 2rem;
+          }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <img src="logo-marfil.png" alt="Logo Marfil">
+    <nav>
+        <ul>
+            <li><a href="#">Inicio</a></li>
+            <li><a href="#">Servicios</a></li>
+            <li><a href="#">Productos</a></li>
+            <li><a href="#">Contacto</a></li>
+        </ul>
+    </nav>
+</header>
+
+<section class="hero">
+    <div class="hero-text">
+        <h1>Precisión y Fuerza en Cada Estructura</h1>
+        <p>Somos una metalúrgica dedicada a la fabricación de estructuras metálicas, piezas industriales y soluciones a medida. Innovación y calidad que resisten el tiempo.</p>
+        <button class="btn">Solicitar Presupuesto</button>
+    </div>
+    <div class="hero-image">
+        <img src="metal-bg.jpg" alt="Estructura metálica">
+    </div>
+</section>
+
+<section>
+    <h2>Nuestros Servicios</h2>
+    <div class="cards">
+        <div class="card">
+            <h3>Corte y Soldadura</h3>
+            <p>Procesos de alta precisión con tecnología de punta.</p>
+        </div>
+        <div class="card">
+            <h3>Estructuras Metálicas</h3>
+            <p>Diseño y montaje de estructuras industriales y comerciales.</p>
+        </div>
+        <div class="card">
+            <h3>Pintura Industrial</h3>
+            <p>Protección y acabado para garantizar durabilidad y estética.</p>
+        </div>
+    </div>
+</section>
+
+<footer>
+    © 2025 Metalúrgica Marfil — Todos los derechos reservados.
+</footer>
+
+</body>
+</html>

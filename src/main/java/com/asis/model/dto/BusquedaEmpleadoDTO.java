@@ -13,7 +13,7 @@ public class BusquedaEmpleadoDTO {
     private String apellido;
     private String dni;
 
-    }
+}
 
 
 

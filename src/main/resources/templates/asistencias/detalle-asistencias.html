@@ -60,7 +60,6 @@
                 <!-- Resumen -->
                 <div class="info-box mb-4">
                     <ul class="mb-0">
-
                         <li><strong>Horas normales:</strong>
                             <span th:text="${#numbers.formatDecimal(totalNormales ?: 0.0, 1, 1) + ' h'}"></span></li>
                         <li><strong>Horas extra:</strong>
@@ -76,8 +75,16 @@
                         <li><strong>Presentismo:</strong>
                             <span th:text="${presentismoEmpleado} ? 'Sí' : 'No'"></span>
                         </li>
+
+                        <!-- NUEVOS TOTALES DE AUSENCIAS -->
                         <li><strong>Faltas sin aviso:</strong>
                             <span th:text="${totalAusencias ?: 0}"></span></li>
+                        <li><strong>Faltas con aviso:</strong>
+                            <span th:text="${totalFaltasConAviso ?: 0}"></span></li>
+                        <li><strong>Vacaciones:</strong>
+                            <span th:text="${totalVacaciones ?: 0}"></span></li>
+                        <li><strong>Ausencias justificadas:</strong>
+                            <span th:text="${totalAusenciasJustificadas ?: 0}"></span></li>
                     </ul>
                 </div>
 
@@ -101,35 +108,31 @@
                     <tbody>
                     <tr th:each="d, iterStat : ${detalle}"
                         th:with="
-        esHogarAdultos=${esHogarAdultos != null ? esHogarAdultos : false},
-        esTurnoCruzado=${#strings.contains(d.fechaFormateada, ' - ')},
-        fechaUnicaParaTurnoCruzado=${esTurnoCruzado ? d.fechaFormateada : ''},
-        esPrimeraFilaDelDia=${iterStat.index == 0 or
-                            (esHogarAdultos and esTurnoCruzado and d.fechaFormateada != detalle[iterStat.index - 1].fechaFormateada) or
-                            (!esHogarAdultos and d.fechaFormateada != detalle[iterStat.index - 1].fechaFormateada) or
-                            (esHogarAdultos and !esTurnoCruzado and d.fechaFormateada != detalle[iterStat.index - 1].fechaFormateada)},
-        rowClass=${d.ausente ? (d.tipoDeAusencia == 'VACACIONES' ? 'vacaciones' :
-                    (d.tipoDeAusencia == 'JUSTIFICADA' ? 'justificada' : 'Falta sin aviso')) :
-                    (d.marcaIncompleta ? 'incompleto' :
-                    (d.esFeriado ? 'feriado' :
-                    (d.esFinDeSemana ? 'finde' : 'normal')))}
-    "
+            esHogarAdultos=${esTurnoNocturno != null ? esTurnoNocturno : false},
+            muestraCruceMedianoche=${d.muestraCruceMedianoche != null ? d.muestraCruceMedianoche : false},
+            esPrimeraFilaDelDia=${iterStat.index == 0 or
+                                d.fechaFormateada != detalle[iterStat.index - 1].fechaFormateada},
+            rowClass=${d.ausente ? (d.tipoDeAusencia == 'VACACIONES' ? 'vacaciones' :
+                        (d.tipoDeAusencia == 'JUSTIFICADA' ? 'justificada' : 'Falta sin aviso')) :
+                        (d.marcaIncompleta ? 'incompleto' :
+                        (d.esFeriado ? 'feriado' :
+                        (d.esFinDeSemana ? 'finde' : 'normal')))}
+        "
                         th:class="${rowClass} + ' clickable-row'"
                         th:data-dni="${d.dni}"
                         th:data-fecha="${d.fechaFormateada != null ?
-                        (esTurnoCruzado ?
-                         #strings.substring(d.fechaFormateada, 6, 10) + '-' + #strings.substring(d.fechaFormateada, 0, 2) + '-CRUZADO' :
-                         #strings.substring(d.fechaFormateada, 6, 10) + '-' + #strings.substring(d.fechaFormateada, 3, 5) + '-' + #strings.substring(d.fechaFormateada, 0, 2))
-                        : ''}"
+                        #strings.substring(d.fechaFormateada, 6, 10) + '-' +
+                        #strings.substring(d.fechaFormateada, 3, 5) + '-' +
+                        #strings.substring(d.fechaFormateada, 0, 2) : ''}"
                         onclick="handleRowClick(this)"
                         style="cursor: pointer;"
                         role="button">
 
-                        <!-- Fecha (solo en la primera fila del día o para turnos cruzados) -->
-                        <td th:text="${(esPrimeraFilaDelDia or esTurnoCruzado) ? d.fechaFormateada : ''}"></td>
+                        <!-- Fecha (solo en la primera fila del día) -->
+                        <td th:text="${esPrimeraFilaDelDia ? d.fechaFormateada : ''}"></td>
 
-                        <!-- Día (solo en la primera fila del día o para turnos cruzados) -->
-                        <td th:text="${(esPrimeraFilaDelDia or esTurnoCruzado) ? d.nombreDia : ''}"></td>
+                        <!-- Día (solo en la primera fila del día) -->
+                        <td th:text="${esPrimeraFilaDelDia ? d.nombreDia : ''}"></td>
 
                         <!-- Entrada -->
                         <td>
@@ -139,10 +142,19 @@
                             <span th:if="${d.tipoDeAusencia != null and d.tipoDeAusencia.name() != 'NO_MARCO'}">-</span>
                         </td>
 
-                        <!-- Salida -->
+                        <!-- Salida - ADAPTADO PARA HORARIOS NOCTURNOS -->
                         <td>
             <span th:if="${d.tipoDeAusencia == null or d.tipoDeAusencia.name() == 'NO_MARCO'}">
-                <span th:text="${d.horaSalida != null ? #temporals.format(d.horaSalida, 'HH:mm') : '-'}"></span>
+                <!-- Si muestra cruce de medianoche, mostrar hora real con indicador -->
+                <span th:if="${muestraCruceMedianoche and d.horaSalidaReal != null}">
+                    <span th:text="${#temporals.format(d.horaSalidaReal, 'HH:mm')}"></span>
+                    <small class="text-muted"> (día sig.)</small>
+                </span>
+                <!-- Caso normal -->
+                <span th:if="${not muestraCruceMedianoche and d.horaSalida != null}">
+                    <span th:text="${#temporals.format(d.horaSalida, 'HH:mm')}"></span>
+                </span>
+                <span th:if="${d.horaSalida == null and d.horaSalidaReal == null}">-</span>
             </span>
                             <span th:if="${d.tipoDeAusencia != null and d.tipoDeAusencia.name() != 'NO_MARCO'}">-</span>
                         </td>
@@ -230,8 +242,7 @@
 
                     </tr>
                     </tbody>
-                </table>
-            </div>
+                </table>            </div>
         </div>
     </div>
 </main>

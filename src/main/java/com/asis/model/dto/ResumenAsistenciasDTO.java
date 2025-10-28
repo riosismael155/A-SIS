@@ -21,6 +21,11 @@ public class ResumenAsistenciasDTO {
     private Empleado.TipoContrato tipoContrato;
     boolean presentismo;
     private boolean tieneMarcasIncompletas;
+    private long totalFaltasConAviso;
+    private long totalVacaciones;
+    private long totalAusenciasJustificadas;
+
+
 }
 
 

@@ -12,7 +12,7 @@ public class EdicionHorarioDTO {
     private String dni;
     private LocalDate fecha;
 
-//  Listas dinámicas de horarios
+    //  Listas dinámicas de horarios
     private List<LocalTime> entradas = new ArrayList<>();
     private List<LocalTime> salidas = new ArrayList<>();
     private String motivoCambio;

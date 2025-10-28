@@ -1,7 +1,11 @@
 package com.asis.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -17,8 +21,7 @@ public class Ausencia {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
-    @ManyToOne(optional = false)
+    @ManyToOne(fetch = FetchType.EAGER)
     private Empleado empleado;
 
     private LocalDate desde;
@@ -33,9 +36,9 @@ public class Ausencia {
     private TipoDeAusencia tipoDeAusencia;
 
     @OneToMany(mappedBy = "justificacion", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIgnore
     @Builder.Default
     private List<RegistroAsistencia> registrosGenerados = new ArrayList<>();
-
 
 
     public enum TipoDeAusencia {

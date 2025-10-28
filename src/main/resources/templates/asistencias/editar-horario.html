@@ -27,10 +27,19 @@
                 <p class="mb-1"><strong>Fecha:</strong> <span th:text="${#temporals.format(edicionDTO.fecha, 'dd/MM/yyyy')}"></span></p>
             </div>
 
-            <!-- Mensaje cuando no hay registros -->
-            <div th:if="${!tieneRegistros}" class="alert alert-info">
-                No hay registros de asistencia para esta fecha. Debe justificar la ausencia; de lo contrario, estos campos permanecerán vacíos.
+
+            <!-- Mensaje para justificar ausencia -->
+            <div th:if="${!tieneRegistros}" class="alert alert-warning d-flex align-items-center justify-content-between p-3 border border-warning rounded">
+                <div>
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    No se registró asistencia para esta fecha.
+                </div>
+                <a th:href="@{/justificaciones/cargar}" class="btn btn-sm">
+                    Haz clic aquí para justificar la ausencia
+                </a>
             </div>
+
+
 
             <!-- Formulario de edición -->
             <form th:action="@{/asistencias/guardar-horario}" th:object="${edicionDTO}" method="post" class="mt-3">

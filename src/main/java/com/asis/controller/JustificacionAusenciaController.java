@@ -1,10 +1,12 @@
 package com.asis.controller;
 
 import com.asis.model.Ausencia;
+import com.asis.model.dto.AusenciaDTO;
 import com.asis.repository.EmpleadoRepository;
 import com.asis.service.JustificacionAusenciaService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -58,4 +60,22 @@ public class JustificacionAusenciaController {
         // Redirigir a la misma página con pestaña de listado activa
         return "redirect:/justificaciones/cargar#listado";
     }
+
+
+    @GetMapping("/buscar-por-empleado")
+    @ResponseBody
+    public ResponseEntity<List<AusenciaDTO>> buscarAusenciasPorEmpleado(@RequestParam Long empleadoId) {
+        if (empleadoId == null) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        List<AusenciaDTO> ausencias = justificacionService.buscarAusenciasJustificadasPorEmpleadoId(empleadoId)
+                .stream()
+                .map(AusenciaDTO::fromEntity)
+                .toList();
+
+        return ResponseEntity.ok(ausencias);
+    }
+
+
 }

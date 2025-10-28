@@ -4,24 +4,10 @@
     <link rel="icon" th:href="@{/favicon.ico}" type="image/x-icon"/>
 </head>
 <script th:src="@{/js/busqueda-dinamica.js}"></script>
-<style>
-    /* Pestaña activa con color del botón btn-action */
-    .nav-tabs .nav-link.active {
-        color: var(--bs-success);
-    }
-
-    /* Pestañas inactivas con color text-success de Bootstrap */
-    .nav-tabs .nav-link:not(.active) {
-        color: var(--bs-dark); /* o un tono más oscuro si querés */
-    }
-
-    /* Hover para pestañas inactivas (opcional) */
-    .nav-tabs .nav-link:not(.active):hover {
-        color: var(--bs-success);    }
-</style>
-
 
 <body>
+<meta name="_csrf" th:content="${_csrf.token}"/>
+<meta name="_csrf_header" th:content="${_csrf.headerName}"/>
 
 <div th:replace="fragments/header :: body"></div>
 <main class="flex-fill">
@@ -43,7 +29,8 @@
             <!-- Pestañas -->
             <ul class="nav nav-tabs mb-4" id="justificacionesTabs" role="tablist">
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link active" id="justificar-tab" data-bs-toggle="tab" data-bs-target="#justificar"
+                    <button class="nav-link active" id="justificar-tab" data-bs-toggle="tab"
+                            data-bs-target="#justificar"
                             type="button" role="tab" aria-controls="justificar" aria-selected="true">
                         Justificar ausencia
                     </button>
@@ -52,6 +39,12 @@
                     <button class="nav-link" id="listado-tab" data-bs-toggle="tab" data-bs-target="#listado"
                             type="button" role="tab" aria-controls="listado" aria-selected="false">
                         Listado de justificaciones
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="buscar-tab" data-bs-toggle="tab" data-bs-target="#buscar"
+                            type="button" role="tab" aria-controls="listado" aria-selected="false">
+                        Buscar Justificaciones por Empleado
                     </button>
                 </li>
             </ul>
@@ -63,7 +56,8 @@
                 <div class="tab-pane fade show active" id="justificar" role="tabpanel" aria-labelledby="justificar-tab">
                     <form th:action="@{/justificaciones/guardar}" method="post" class="row g-3">
                         <div class="col-md-4">
-                            <div class="form-group d-flex flex-column position-relative flex-grow-1" style="min-width: 250px;">
+                            <div class="form-group d-flex flex-column position-relative flex-grow-1"
+                                 style="min-width: 250px;">
                                 <label for="empleado" class="form-label">Empleado</label>
                                 <input type="text" id="empleado" name="empleado" class="form-control"
                                        placeholder="Buscar por apellido, nombre o DNI" autocomplete="off">
@@ -93,11 +87,14 @@
                                         th:value="${tipo.name()}"
                                         th:text="${tipo.descripcion}">
                                 </option>
-
                             </select>
 
-
+                            <!-- 🔥 El badge va acá, fuera del select -->
+                            <div class="mt-2">
+                                <span id="previewBadge" class="badge bg-secondary" style="display:none;"></span>
+                            </div>
                         </div>
+
 
                         <div class="col-md-7">
                             <label for="descripcion" class="form-label">Descripción</label>
@@ -131,13 +128,25 @@
                                 <td th:text="${justificacion.empleado.nombre + ' ' + justificacion.empleado.apellido}"></td>
                                 <td th:text="${#temporals.format(justificacion.desde, 'dd/MM/yyyy')}"></td>
                                 <td th:text="${#temporals.format(justificacion.hasta, 'dd/MM/yyyy')}"></td>
-
                                 <td th:text="${justificacion.tipoDeAusencia.descripcion}"></td>
-                                <td th:text="${justificacion.descripcion}"></td>
                                 <td>
-                                    <form th:action="@{/justificaciones/eliminar/{id}(id=${justificacion.id})}" method="post"
-                                          onsubmit="return confirm('¿Seguro que querés eliminar esta justificación?');">
+    <span class="badge"
+          th:text="${justificacion.tipoDeAusencia.descripcion}"
+          th:class="${(justificacion.tipoDeAusencia.name() == 'JUSTIFICADA') ? 'badge bg-success' :
+                     (justificacion.tipoDeAusencia.name() == 'VACACIONES') ? 'badge bg-info' :
+                     (justificacion.tipoDeAusencia.name() == 'NO_MARCO') ? 'badge bg-warning' :
+                     (justificacion.tipoDeAusencia.name() == 'FALTA_CON_AVISO') ? 'badge bg-secondary' :
+                     (justificacion.tipoDeAusencia.name() == 'FALTA_SIN_AVISO') ? 'badge bg-danger' :
+                     'badge bg-secondary'}">
+    </span>
+                                </td>
 
+                                <td>
+                                    <form th:action="@{/justificaciones/eliminar/{id}(id=${justificacion.id})}"
+                                          method="post"
+                                          onsubmit="return confirm('¿Seguro que querés eliminar esta justificación?');">
+                                        <input type="hidden" th:name="${_csrf.parameterName}"
+                                               th:value="${_csrf.token}"/>
                                         <button type="submit" class="btn btn-sm btn-outline-danger">
                                             <i class="bi bi-trash"></i> Eliminar
                                         </button>
@@ -152,26 +161,255 @@
                     </div>
                 </div>
 
+                <!-- Pestaña 3: Búsqueda por Empleado -->
+                <div class="tab-pane fade" id="buscar" role="tabpanel" aria-labelledby="buscar-tab">
+                    <div class="row g-3 mt-3">
+                        <div class="col-md-6">
+                            <div class="form-group d-flex flex-column position-relative flex-grow-1">
+                                <label for="empleadoBuscar" class="form-label">Buscar empleado</label>
+                                <input type="text" id="empleadoBuscar" class="form-control"
+                                       placeholder="Buscar por apellido, nombre o DNI" autocomplete="off">
+                                <input type="hidden" id="empleadoIdBuscar" name="empleadoIdBuscar">
+                                <div id="sugerenciasBuscar" class="list-group position-absolute w-100 z-3"
+                                     style="top: 100%; max-height: 200px; overflow-y: auto; display: none;"></div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 d-flex align-items-end">
+                            <button type="button" id="btnBuscarAusencias" class="btn-action">
+                                <i class="bi bi-search me-1"></i> Buscar
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive mt-4">
+                        <table class="table table-striped table-hover align-middle" id="tablaResultadosBusqueda">
+                            <thead class="table-light">
+                            <tr>
+                                <th>Empleado</th>
+                                <th>Desde</th>
+                                <th>Hasta</th>
+                                <th>Tipo</th>
+                                <th>Descripción</th>
+                                <th>Acciones</th>
+                            </tr>
+                            </thead>
+                            <tbody id="resultadosBusqueda">
+                            <tr>
+                                <td colspan="6" class="text-center text-muted">
+                                    Realice una búsqueda para ver las ausencias de un empleado
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </main>
 
-<div th:replace="fragments/footer :: footer"></div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+    // Obtener el token CSRF desde los meta tags
+    const csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+    const csrfHeader = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+
     document.addEventListener("DOMContentLoaded", function () {
-        // Si la URL trae un hash (#listado, #justificar, etc.)
-        let hash = window.location.hash;
-        if (hash) {
-            let tabTrigger = document.querySelector(`button[data-bs-target="${hash}"]`);
-            if (tabTrigger) {
-                let tab = new bootstrap.Tab(tabTrigger);
-                tab.show();
+        const empleadoBuscarInput = document.getElementById("empleadoBuscar");
+        const empleadoIdBuscarInput = document.getElementById("empleadoIdBuscar");
+        const sugerenciasBuscarDiv = document.getElementById("sugerenciasBuscar");
+        const btnBuscarAusencias = document.getElementById("btnBuscarAusencias");
+        const resultadosBusquedaTbody = document.getElementById("resultadosBusqueda");
+
+        // Búsqueda de empleados
+        empleadoBuscarInput.addEventListener("input", function () {
+            const query = this.value.trim();
+
+            if (query.length < 2) {
+                sugerenciasBuscarDiv.innerHTML = "";
+                sugerenciasBuscarDiv.style.display = "none";
+                return;
+            }
+
+            fetch(`/empleados/buscar?q=${encodeURIComponent(query)}`)
+                .then(response => response.json())
+                .then(data => {
+                    sugerenciasBuscarDiv.innerHTML = "";
+
+                    if (data.length > 0) {
+                        data.forEach(e => sugerenciasBuscarDiv.appendChild(crearSugerenciaEmpleado(e)));
+                        sugerenciasBuscarDiv.style.display = "block";
+                    } else {
+                        sugerenciasBuscarDiv.style.display = "none";
+                    }
+                })
+                .catch(error => {
+                    console.error("Error al buscar empleados:", error);
+                    sugerenciasBuscarDiv.innerHTML = "";
+                    sugerenciasBuscarDiv.style.display = "none";
+                });
+        });
+
+        function crearSugerenciaEmpleado(e) {
+            const item = document.createElement("a");
+            item.href = "#";
+            item.className = "list-group-item list-group-item-action";
+            item.dataset.id = e.id;
+            item.dataset.nombre = e.nombre;
+            item.dataset.apellido = e.apellido;
+            item.dataset.dni = e.dni;
+            item.textContent = `${e.apellido} ${e.nombre} - ${e.dni}`;
+
+            item.addEventListener("click", function (event) {
+                event.preventDefault();
+                empleadoBuscarInput.value = `${this.dataset.apellido} ${this.dataset.nombre} - ${this.dataset.dni}`;
+                empleadoIdBuscarInput.value = this.dataset.id;
+                sugerenciasBuscarDiv.innerHTML = "";
+                sugerenciasBuscarDiv.style.display = "none";
+            });
+
+            return item;
+        }
+
+        // Búsqueda de ausencias
+        btnBuscarAusencias.addEventListener("click", function() {
+            const empleadoId = empleadoIdBuscarInput.value;
+
+            if (!empleadoId) {
+                alert('Por favor, seleccione un empleado de la lista');
+                return;
+            }
+
+            // Mostrar loading
+            resultadosBusquedaTbody.innerHTML = '<tr><td colspan="6" class="text-center"><div class="spinner-border" role="status"></div> Buscando ausencias...</td></tr>';
+
+            // Buscar ausencias del empleado
+            fetch(`/justificaciones/buscar-por-empleado?empleadoId=${encodeURIComponent(empleadoId)}`, {
+    headers: {
+        [csrfHeader]: csrfToken
+    }
+})
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Error en la búsqueda');
+                    }
+                    return response.json();
+                })
+                .then(ausencias => {
+                    console.log('Datos recibidos:', ausencias); // Para debug
+                    mostrarResultadosBusqueda(ausencias);
+                })
+                .catch(error => {
+                    console.error("Error al buscar ausencias:", error);
+                    resultadosBusquedaTbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error al cargar las ausencias</td></tr>';
+                });
+        });
+
+        function mostrarResultadosBusqueda(ausencias) {
+    if (ausencias.length === 0) {
+        resultadosBusquedaTbody.innerHTML = `
+            <tr><td colspan="6" class="text-center">No se encontraron ausencias para este empleado</td></tr>`;
+        return;
+    }
+
+    let html = '';
+    ausencias.forEach(ausencia => {
+        // Fechas
+        const fechaDesde = formatearFechaSegura(ausencia.desde);
+        const fechaHasta = ausencia.hasta ? formatearFechaSegura(ausencia.hasta) : '-';
+
+        // Tipo formateado
+        const tipoFormateado = formatearTipoAusencia(ausencia.tipoDeAusencia);
+        const claseBadge = obtenerClaseBadge(ausencia.tipoDeAusencia);
+
+        html += `
+            <tr>
+<td>${[ausencia.apellidoEmpleado, ausencia.nombreEmpleado].filter(Boolean).join(' ') || '-'}</td>
+                <td>${fechaDesde}</td>
+                <td>${fechaHasta}</td>
+                <td><span class="badge ${claseBadge}">${tipoFormateado}</span></td>
+                <td>${ausencia.descripcion || '-'}</td>
+                <td>
+                    <form action="/justificaciones/eliminar/${ausencia.id}" method="post"
+                          onsubmit="return confirm('¿Seguro que querés eliminar esta ausencia?');">
+                        <input type="hidden" name="_csrf" value="${csrfToken}" />
+                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                            <i class="bi bi-trash"></i> Eliminar
+                        </button>
+                    </form>
+                </td>
+            </tr>
+        `;
+    });
+
+    resultadosBusquedaTbody.innerHTML = html;
+}
+
+
+
+        // Función más robusta para formatear fechas
+        function formatearFechaSegura(fechaString) {
+            try {
+                // Si ya es una fecha válida
+                if (fechaString instanceof Date) {
+                    return fechaString.toLocaleDateString('es-AR');
+                }
+
+                // Si es string, intentar parsear
+                const fecha = new Date(fechaString);
+                if (isNaN(fecha.getTime())) {
+                    // Si falla el parsing, mostrar el valor original
+                    console.warn('Fecha inválida:', fechaString);
+                    return fechaString;
+                }
+                return fecha.toLocaleDateString('es-AR');
+            } catch (error) {
+                console.error('Error formateando fecha:', error, fechaString);
+                return fechaString; // Mostrar el valor original si hay error
             }
         }
+
+        function formatearTipoAusencia(tipo) {
+            const tipos = {
+                'JUSTIFICADA': 'Justificada',
+                'VACACIONES': 'Vacaciones',
+                'NO_MARCO': 'No marcó',
+                'FALTA_CON_AVISO': 'Falta con aviso',
+                'FALTA_SIN_AVISO': 'Falta sin aviso'
+            };
+            return tipos[tipo] || tipo || 'Sin especificar';
+        }
+
+        function obtenerClaseBadge(tipo) {
+            const clases = {
+                'JUSTIFICADA': 'bg-success',
+                'VACACIONES': 'bg-info',
+                'NO_MARCO': 'bg-warning',
+                'FALTA_CON_AVISO': 'bg-secondary',
+                'FALTA_SIN_AVISO': 'bg-danger'
+            };
+            return clases[tipo] || 'bg-secondary';
+        }
+
+        // Ocultar sugerencias si se hace clic fuera
+        document.addEventListener("click", function (event) {
+            if (!sugerenciasBuscarDiv.contains(event.target) && event.target !== empleadoBuscarInput) {
+                sugerenciasBuscarDiv.innerHTML = "";
+                sugerenciasBuscarDiv.style.display = "none";
+            }
+        });
+
+        // Ocultar sugerencias al presionar ESC
+        empleadoBuscarInput.addEventListener("keydown", function (event) {
+            if (event.key === "Escape") {
+                sugerenciasBuscarDiv.innerHTML = "";
+                sugerenciasBuscarDiv.style.display = "none";
+            }
+        });
     });
+
 </script>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

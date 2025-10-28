@@ -281,5 +281,17 @@ tr {
   color: #fff !important;
   border-color: #0F6C0F !important;
 }
+/* Pestaña activa con color del botón btn-action */
+    .nav-tabs .nav-link.active {
+        color: var(--bs-success)!important;
+    }
 
+    /* Pestañas inactivas con color text-success de Bootstrap */
+    .nav-tabs .nav-link:not(.active) {
+        color: var(--bs-dark)!important; /* o un tono más oscuro si querés */
+    }
+
+    /* Hover para pestañas inactivas (opcional) */
+    .nav-tabs .nav-link:not(.active):hover {
+        color: var(--bs-success)!important;    }
 /*# sourceMappingURL=styles.css.map */

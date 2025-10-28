@@ -8,6 +8,7 @@
     <div class="container">
         <div class="bloque-elevado px-5 py-4 mt-container">
 
+            <!-- Encabezado -->
             <div class="d-flex align-items-center mb-4">
                 <a href="/"
                    class="me-3 color-iconos d-flex align-items-center"
@@ -15,67 +16,115 @@
                     <i class="bi bi-arrow-left-circle me-1 fs-5"></i>
                 </a>
                 <i class="bi bi-calendar-check fs-5 me-2 color-iconos"></i>
-                <h4 class="mb-0 text-h">Lista de Planillas Mensuales de Asistencia</h4>
+                <h4 class="mb-0 text-h">Planillas de Asistencia</h4>
             </div>
 
-            <p class="mb-4">Seleccioná una planilla para ver el resumen de horas trabajadas por todos los empleados en
-                ese período.</p>
+            <!-- Pestañas -->
+            <ul class="nav nav-tabs mb-4" id="planillasTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="listado-tab" data-bs-toggle="tab" data-bs-target="#listado"
+                            type="button" role="tab" aria-controls="listado" aria-selected="true">
+                        Planillas semanales
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="buscar-tab" data-bs-toggle="tab" data-bs-target="#buscar"
+                            type="button" role="tab" aria-controls="buscar" aria-selected="false">
+                        Planilla mensual
+                    </button>
+                </li>
+            </ul>
 
-            <!-- Tabla -->
-            <!-- Sin table-responsive -->
-                <table class="table table-bordered table-hover table-excel">
-                    <thead class="table-dark">
-                    <tr>
-                        <th>Descripción</th>
-                        <th>Desde</th>
-                        <th>Hasta</th>
-                        <th>Fecha de Carga</th>
-                        <th>Ver Resumen</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <tr th:each="log : ${logs}">
-                        <td th:text="${log.descripcion}"></td>
-                        <td th:text="${#temporals.format(log.desde, 'dd/MM/yyyy')}"></td>
-                        <td th:text="${#temporals.format(log.hasta, 'dd/MM/yyyy')}"></td>
-                        <td th:text="${#temporals.format(log.fechaCarga, 'dd/MM/yyyy HH:mm')}"></td>
-                        <td class="position-relative text-nowrap" style="width: 1%;">
-                            <div class="d-flex align-items-center gap-2">
+            <!-- Contenido de las pestañas -->
+            <div class="tab-content" id="planillasTabsContent">
 
-                                <!-- Botón Ver Detalle -->
-                                <a th:href="@{/asistencias/resumen-por-log/{logId}(logId=${log.id})}"
-                                   class="btn btn-outline-primary btn-sm">
-                                    <i class="bi bi-eye"></i> Ver Detalle
-                                </a>
+                <!-- Pestaña 1: Listado -->
+                <div class="tab-pane fade show active" id="listado" role="tabpanel" aria-labelledby="listado-tab">
+                    <p class="mb-4">Seleccioná una planilla para ver el resumen de horas trabajadas por todos los empleados en
+                        ese período.</p>
 
-                                <!-- Botón de menú -->
-                                <div class="dropdown">
-                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
-                                            id="dropdownMenuBtn__[[${log.id}]]" data-bs-toggle="dropdown"
-                                            aria-expanded="false">
-                                        <i class="bi bi-three-dots-vertical"></i>
-                                    </button>
+                    <table class="table table-bordered table-hover table-excel">
+                        <thead class="table-dark">
+                        <tr>
+                            <th>Descripción</th>
+                            <th>Desde</th>
+                            <th>Hasta</th>
+                            <th>Fecha de Carga</th>
+                            <th>Ver Resumen</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="log : ${logs}">
+                            <td th:text="${log.descripcion}"></td>
+                            <td th:text="${#temporals.format(log.desde, 'dd/MM/yyyy')}"></td>
+                            <td th:text="${#temporals.format(log.hasta, 'dd/MM/yyyy')}"></td>
+                            <td th:text="${#temporals.format(log.fechaCarga, 'dd/MM/yyyy HH:mm')}"></td>
+                            <td class="position-relative text-nowrap" style="width: 1%;">
+                                <div class="d-flex align-items-center gap-2">
 
-                                    <!-- Menú desplegable -->
-                                    <ul class="dropdown-menu" aria-labelledby="dropdownMenuBtn__[[${log.id}]]">
-                                        <li>
-                                            <form th:action="@{'/asistencias/logs/eliminar/' + ${log.id}}" method="post"
-                                                  th:onsubmit="return confirm('¿Estás seguro de que querés eliminar este log?')">
-                                                <button type="submit"
-                                                        class="btn btn-sm btn-outline-danger">
-                                                    <i class="bi bi-trash"></i> Eliminar
-                                                </button>
-                                            </form>
-                                        </li>
-                                    </ul>
+                                    <!-- Botón Ver Detalle -->
+                                    <a th:href="@{/asistencias/resumen-por-log/{logId}(logId=${log.id})}"
+                                       class="btn btn-outline-primary btn-sm">
+                                        <i class="bi bi-eye"></i> Ver Detalle
+                                    </a>
+
+                                    <!-- Botón de menú -->
+                                    <div class="dropdown">
+                                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+                                                id="dropdownMenuBtn__[[${log.id}]]" data-bs-toggle="dropdown"
+                                                aria-expanded="false">
+                                            <i class="bi bi-three-dots-vertical"></i>
+                                        </button>
+
+                                        <!-- Menú desplegable -->
+                                        <ul class="dropdown-menu" aria-labelledby="dropdownMenuBtn__[[${log.id}]]">
+                                            <li>
+                                                <form th:action="@{'/asistencias/logs/eliminar/' + ${log.id}}" method="post"
+                                                      th:onsubmit="return confirm('¿Estás seguro de que querés eliminar este log?')">
+                                                    <button type="submit"
+                                                            class="btn btn-sm btn-outline-danger">
+                                                        <i class="bi bi-trash"></i> Eliminar
+                                                    </button>
+                                                </form>
+                                            </li>
+                                        </ul>
+                                    </div>
+
                                 </div>
+                            </td>
+                        </tr>
+                        <tr th:if="${#lists.isEmpty(logs)}">
+                            <td colspan="5" class="text-center">No hay planillas registradas.</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
 
+                <!-- Pestaña 2: Buscar por Fechas -->
+                <div class="tab-pane fade" id="buscar" role="tabpanel" aria-labelledby="buscar-tab">
+                    <form th:action="@{/asistencias/resumen-log-rango}" method="get"
+                          class="d-flex justify-content-between align-items-end mt-3 flex-wrap">
+
+                        <!-- BLOQUE: Rango de fechas (Desde - Hasta) -->
+                        <div class="form-group d-flex flex-column" style="min-width: 250px;">
+                            <label class="form-label mb-1">Rango de fechas (Desde - Hasta)</label>
+                            <div class="d-flex gap-2">
+                                <input type="date" name="desde" id="desde" th:value="${desde}" class="form-control" style="width: 150px;" required>
+                                <input type="date" name="hasta" id="hasta" th:value="${hasta}" class="form-control" style="width: 150px;" required>
                             </div>
-                        </td>
+                        </div>
 
-                    </tr>
-                    </tbody>
-                </table>
+                        <!-- Botón Buscar -->
+                        <div class="d-flex justify-content-end">
+                            <button type="submit" class="btn-action d-flex align-items-center gap-1 px-3">
+                                <i class="bi bi-search"></i> Buscar
+                            </button>
+                        </div>
+
+                    </form>
+                </div>
+
+            </div>
         </div>
 
     </div>

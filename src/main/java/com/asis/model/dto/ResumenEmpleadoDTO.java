@@ -65,8 +65,11 @@ public class ResumenEmpleadoDTO {
     private boolean presentismo;
     private LocalDateTime fechaHoraEntrada;
     private LocalDateTime fechaHoraSalida;
-
-
+    private int totalFaltasConAviso;
+    private int totalVacaciones;
+    private int totalAusenciasJustificadas;
+    private boolean muestraCruceMedianoche;
+    private LocalTime horaSalidaReal;
 
 
 // Agregar getter y setter (si usas Lombok @Data, se generan automáticamente)
@@ -97,7 +100,7 @@ public class ResumenEmpleadoDTO {
                               boolean justificada,
                               boolean tieneHorasJustificadas, boolean tieneHorasReales,
                               double horasJustificadasDia, double horasRealesDia,
-                              int diasTrabajados, int minutosTardeTotales, double despuesDeHora, int minutosTarde, String fotoEntradaBase64, String fotoSalidaBase64,boolean presentismo) {
+                              int diasTrabajados, int minutosTardeTotales, double despuesDeHora, int minutosTarde, String fotoEntradaBase64, String fotoSalidaBase64, boolean presentismo) {
         this.dni = dni;
         this.nombreCompleto = nombreCompleto;
         this.totalHoras = totalHoras;
@@ -130,6 +133,7 @@ public class ResumenEmpleadoDTO {
         this.fotoSalidaBase64 = fotoSalidaBase64;
         this.presentismo = presentismo;
     }
+
     public double getHorasExtrasParaVisualizacion() {
         if ("EXTRA".equals(this.tipoHora)) {
             return this.horasTrabajadas; // Para pares puramente extras, todas las horas trabajadas son extras
@@ -140,7 +144,6 @@ public class ResumenEmpleadoDTO {
         }
         return 0;
     }
-
 
 
 }

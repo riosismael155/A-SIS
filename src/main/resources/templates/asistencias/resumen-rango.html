@@ -1,55 +1,55 @@
 <!DOCTYPE html>
 <html lang="es" xmlns:th="http://www.thymeleaf.org">
-<head th:replace="fragments/header :: head('Planilla Semanal de Asistencias')">
+<head th:replace="fragments/header :: head('Resumen Mensual de Asistencias')">
     <link rel="icon" th:href="@{/favicon.ico}" type="image/x-icon"/>
-
-
 </head>
-<style>/* Cuadritos de leyenda */
-    .legend-box {
-    display: inline-block;
-    width: 18px;
-    height: 18px;
-    border-radius: 3px;
-    border: 1px solid rgba(0,0,0,0.1);
-    }
 
-    /* Ajuste visual en modo oscuro (opcional si usás tema oscuro) */
+<style>
+    .legend-box {
+        display: inline-block;
+        width: 18px;
+        height: 18px;
+        border-radius: 3px;
+        border: 1px solid rgba(0,0,0,0.1);
+    }
     .table-dark .legend-box {
-    border-color: rgba(255,255,255,0.3);
+        border-color: rgba(255,255,255,0.3);
     }
 </style>
-<body>
 
+<body>
 <div th:replace="fragments/header :: body"></div>
+
 <main class="flex-fill">
     <div class="container">
         <div class="bloque-elevado px-5 py-4 mt-container">
 
+            <!-- Encabezado -->
             <div class="d-flex align-items-center mb-4">
-                <a href="/asistencias/logs"
-                   class="me-3 color-iconos d-flex align-items-center"
-                   title="Volver atrás">
+                <a href="/asistencias/logs" class="me-3 color-iconos d-flex align-items-center" title="Volver atrás">
                     <i class="bi bi-arrow-left-circle me-1 fs-5"></i>
                 </a>
-                <i class="bi bi-bar-chart-fill fs-5 me-2 color-iconos"></i>
-                <h4 class="mb-0 text-h">Resumen de Asistencia</h4>
+                <i class="bi bi-calendar-range fs-5 me-2 color-iconos"></i>
+                <h4 class="mb-0 text-h">Resumen Mensual de Asistencias</h4>
             </div>
-
-            <script th:src="@{/js/navigation.js}" defer></script>
 
             <!-- Filtro por tipo de contrato -->
             <div class="row mb-4 align-items-center">
                 <!-- Columna del filtro -->
                 <div class="col-md-5">
-                    <form method="get" th:action="@{/asistencias/resumen-por-log/{logId}(logId=${log.id})}"
+                    <form method="get" th:action="@{/asistencias/resumen-log-rango}"
                           class="row g-2 align-items-center">
-                        <!-- Select con label integrado -->
+
+                        <!-- Inputs ocultos para mantener rango de fechas -->
+                        <input type="hidden" name="desde" th:value="${#temporals.format(desde,'yyyy-MM-dd')}">
+                        <input type="hidden" name="hasta" th:value="${#temporals.format(hasta,'yyyy-MM-dd')}">
+
+
                         <div class="col-md-7">
                             <div class="input-group">
-                    <span class="input-group-text bg-light border-end-0 pe-1">
-                        <i class="bi bi-funnel"></i>
-                    </span>
+            <span class="input-group-text bg-light border-end-0 pe-1">
+                <i class="bi bi-funnel"></i>
+            </span>
                                 <select id="tipoContrato" name="tipoContrato" class="form-select border-start-0 ps-1">
                                     <option value="ALL">Todos los contratos</option>
                                     <option th:each="tipo : ${tiposContrato}"
@@ -61,7 +61,6 @@
                             </div>
                         </div>
 
-                        <!-- Botones -->
                         <div class="col-md-5">
                             <div class="d-flex">
                                 <button type="submit" class="btn-action">
@@ -77,8 +76,8 @@
                     <div class="d-flex justify-content-end align-items-center">
             <span class="badge bg-light text-dark fs-6">
                 <strong>Período:</strong>
-                <span th:text="${#temporals.format(log.desde, 'dd/MM/yyyy')}"></span> -
-                <span th:text="${#temporals.format(log.hasta, 'dd/MM/yyyy')}"></span>
+               <span th:text="${#temporals.format(desde, 'dd/MM/yyyy')}"></span> -
+      <span th:text="${#temporals.format(hasta, 'dd/MM/yyyy')}"></span>
             </span>
                     </div>
                 </div>
@@ -158,13 +157,13 @@
 
 <div th:replace="fragments/footer :: footer"></div>
 
-
 <script th:inline="javascript">
     document.addEventListener("DOMContentLoaded", function () {
         const rows = document.querySelectorAll(".clickable-row");
-        const desde = /*[[${#temporals.format(log.desde, 'yyyy-MM-dd')}]]*/ '2025-06-21';
-        const hasta = /*[[${#temporals.format(log.hasta, 'yyyy-MM-dd')}]]*/ '2025-07-20';
+        const desde = /*[[${#temporals.format(desde, 'yyyy-MM-dd')}]]*/ '';
+        const hasta = /*[[${#temporals.format(hasta, 'yyyy-MM-dd')}]]*/ '';
 
+        // Click en fila para abrir detalle
         rows.forEach(row => {
             row.addEventListener("click", () => {
                 const dni = row.getAttribute("data-dni");
@@ -173,14 +172,14 @@
             });
         });
 
-        // Inicializar sin iconos visibles
+        // Inicializar iconos de ordenamiento invisibles
         document.querySelectorAll(".sort-icon").forEach(i => {
             i.className = "bi bi-arrow-down-up sort-icon";
-            i.style.opacity = "0"; // Completamente transparente al inicio
+            i.style.opacity = "0";
         });
     });
 
-    // Definimos la función en window para que la encuentren los onclick de los <th>
+    // Función de ordenamiento con iconos
     window.sortTable = function(n) {
         const tableEl = document.querySelector(".table-excel");
         if (!tableEl) return;
@@ -189,25 +188,25 @@
         const rows = Array.from(tbody.rows);
         if (rows.length === 0) return;
 
-        // Detectar números (limpiamos puntos y comas comunes en Argentina)
+        // Detectar si columna es numérica
         const sample = rows[0].cells[n].innerText.trim();
-        const numericSample = sample.replace(/\./g, '').replace(',', '.');
+        const numericSample = sample.replace(/\./g,'').replace(',', '.');
         const isNumeric = !isNaN(parseFloat(numericSample));
 
-        rows.sort((a, b) => {
+        // Ordenar filas
+        rows.sort((a,b) => {
             let valA = a.cells[n].innerText.trim();
             let valB = b.cells[n].innerText.trim();
-
             if (isNumeric) {
-                valA = parseFloat(valA.replace(/\./g, '').replace(',', '.')) || 0;
-                valB = parseFloat(valB.replace(/\./g, '').replace(',', '.')) || 0;
+                valA = parseFloat(valA.replace(/\./g,'').replace(',', '.')) || 0;
+                valB = parseFloat(valB.replace(/\./g,'').replace(',', '.')) || 0;
                 return valA - valB;
             } else {
-                return valA.localeCompare(valB, undefined, {numeric: true, sensitivity: 'base'});
+                return valA.localeCompare(valB, undefined, {numeric:true, sensitivity:'base'});
             }
         });
 
-        // Alternar orden asc/desc
+        // Alternar asc/desc
         const prevCol = tableEl.dataset.sortedCol;
         const prevOrder = tableEl.dataset.sortedOrder;
         if (String(prevCol) === String(n) && prevOrder === 'asc') {
@@ -218,29 +217,62 @@
         }
         tableEl.dataset.sortedCol = n;
 
-        // Reemplazar filas en tbody
+        // Reemplazar filas
         tbody.innerHTML = "";
         rows.forEach(row => tbody.appendChild(row));
 
-        // Actualizar íconos: reset todos y marcar el activo
+        // Actualizar iconos
         document.querySelectorAll(".sort-icon").forEach(i => {
             i.className = "bi bi-arrow-down-up sort-icon";
-            i.style.opacity = "0"; // Ocultar todos
-            i.classList.remove('active');
+            i.style.opacity = "0";
+            i.classList.remove("active");
         });
-
         const th = tableEl.querySelectorAll("thead th")[n];
         const icon = th ? th.querySelector(".sort-icon") : null;
         if (icon) {
-            icon.style.opacity = "1"; // Hacer visible el icono activo
-            if (tableEl.dataset.sortedOrder === 'asc') {
-                icon.className = "bi bi-arrow-up-short sort-icon active";
-            } else {
-                icon.className = "bi bi-arrow-down-short sort-icon active";
-            }
+            icon.style.opacity = "1";
+            icon.className = tableEl.dataset.sortedOrder === 'asc'
+                ? "bi bi-arrow-up-short sort-icon active"
+                : "bi bi-arrow-down-short sort-icon active";
         }
     };
+
+    // Función de impresión (igual que antes)
+    function printTable() {
+        const bloque = document.querySelector(".bloque-elevado");
+        if (!bloque) return;
+        const tabla = bloque.querySelector(".table");
+        if (!tabla) return;
+
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write(`
+            <html>
+            <head>
+                <title>Resumen de Asistencia por Fechas</title>
+                <style>
+                    @page { size: A4 portrait; margin: 10mm; }
+                    html, body { font-family: Arial, sans-serif; font-size: 10px; }
+                    h4 { text-align: center; margin-bottom: 10px; }
+                    table { width: 100%; border-collapse: collapse; }
+                    th, td { border: 1px solid #000; padding: 3px 4px; }
+                    th { background: #333; color: #fff; }
+                    .table-success { background-color: #d1e7dd !important; }
+                    .table-warning { background-color: #fff3cd !important; }
+                    .table-danger  { background-color: #f8d7da !important; }
+                </style>
+            </head>
+            <body>
+                <h4>Resumen de Asistencia por Fechas</h4>
+                ${tabla.outerHTML}
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
+        printWindow.onload = () => printWindow.print();
+    }
 </script>
+
+
 <script>
     function printTable() {
         const bloque = document.querySelector(".bloque-elevado");

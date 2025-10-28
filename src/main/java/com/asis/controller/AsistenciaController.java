@@ -118,6 +118,45 @@ public class AsistenciaController {
         return "asistencias/resumen-log";
     }
 
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'SUPERVISOR')")
+    @GetMapping("/resumen-log-rango")
+    public String mostrarResumenPorFechas(
+            @RequestParam("desde") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
+            @RequestParam("hasta") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta,
+            @RequestParam(required = false) String tipoContrato,
+            Model model) {
+
+        Empleado.TipoContrato tipoEnum = null;
+
+        // Si se selecciona tipo de contrato (opcional)
+        if (tipoContrato != null && !tipoContrato.isEmpty()) {
+            if ("ALL".equals(tipoContrato)) {
+                tipoEnum = null; // "Todos los contratos"
+            } else {
+                try {
+                    tipoEnum = Empleado.TipoContrato.valueOf(tipoContrato);
+                } catch (IllegalArgumentException e) {
+                    // No pasa nada, se mantiene null
+                }
+            }
+        } else {
+            // Valor por defecto si no se pasa tipo de contrato
+            tipoEnum = Empleado.TipoContrato.PERMANENTE;
+        }
+
+        // Generar el resumen entre fechas (deberás implementar este método)
+        List<ResumenAsistenciasDTO> resumen = excelService.generarResumenTotalesPorRango(desde, hasta, tipoEnum);
+
+        model.addAttribute("desde", desde);
+        model.addAttribute("hasta", hasta);
+        model.addAttribute("resumen", resumen);
+        model.addAttribute("tiposContrato", Empleado.TipoContrato.values());
+        model.addAttribute("tipoContratoSeleccionado", tipoEnum);
+
+        return "asistencias/resumen-rango";
+    }
+
+
     @PreAuthorize("hasAnyRole('ADMINISTRADOR')")
     @PostMapping("/logs/eliminar/{logId}")
     public String eliminarLog(@PathVariable Long logId, RedirectAttributes redirectAttrs) {

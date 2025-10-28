@@ -1,7 +1,7 @@
 package com.asis.service;
 
-import com.asis.model.Empleado;
 import com.asis.model.Ausencia;
+import com.asis.model.Empleado;
 import com.asis.model.RegistroAsistencia;
 import com.asis.repository.EmpleadoRepository;
 import com.asis.repository.JustificacionAusenciaRepository;
@@ -12,7 +12,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -102,7 +101,6 @@ public class JustificacionAusenciaService {
     }
 
 
-
     @Transactional
     public void eliminarJustificacion(Long id) {
         if (!justificacionRepo.existsById(id)) {
@@ -114,5 +112,16 @@ public class JustificacionAusenciaService {
     public Ausencia obtenerAusenciaEmpleadoEnFecha(Empleado empleado, LocalDate fecha) {
         return justificacionRepo.findByEmpleadoAndFecha(empleado, fecha).orElse(null);
     }
+
+    public List<Ausencia> buscarAusenciasJustificadasPorEmpleadoId(Long empleadoId) {
+        Empleado empleado = empleadoRepo.findById(empleadoId)
+                .orElseThrow(() -> new RuntimeException("No se encontró el empleado con ID: " + empleadoId));
+
+        return justificacionRepo.buscarAusenciasPorEmpleado(
+                empleado.getId(),
+                Ausencia.TipoDeAusencia.FALTA_SIN_AVISO
+        );
+    }
+
 
 }

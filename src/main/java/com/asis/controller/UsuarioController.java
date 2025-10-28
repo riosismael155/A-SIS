@@ -1,10 +1,9 @@
 package com.asis.controller;
 
 import com.asis.model.Empleado;
-import com.asis.model.Usuario;
 import com.asis.model.Rol;
+import com.asis.model.Usuario;
 import com.asis.repository.EmpleadoRepository;
-import com.asis.service.EmpleadoService;
 import com.asis.service.UsuarioService;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;

@@ -28,5 +28,4 @@ public class Usuario {
     private Empleado empleado;
 
 
-
 }

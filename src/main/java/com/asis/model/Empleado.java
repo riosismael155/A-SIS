@@ -33,6 +33,13 @@ public class Empleado {
     private LocalTime horaEntrada2;
     private LocalTime horaSalida2;
 
+    // Turno hogar 3
+    private LocalTime horaEntrada3;
+    private LocalTime horaSalida3;
+    // Turno hogar 4
+    private LocalTime horaEntrada4;
+    private LocalTime horaSalida4;
+
     // Empleado.java
     @ManyToOne
     @JoinColumn(name = "usuario_id")

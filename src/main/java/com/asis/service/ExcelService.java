@@ -19,7 +19,6 @@ import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.time.format.TextStyle;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 @Service
@@ -53,30 +52,42 @@ public class ExcelService {
         log.setDesde(dto.getDesde());
         log.setHasta(dto.getHasta());
         log.setDescripcion(descripcion);
-        log.setFechaCarga(LocalDateTime.now());
+        log.setFechaCarga(LocalDateTime.now().minusHours(3));
+
         log.setCantidadRegistros(registros.size());
 
         logCargaRepository.save(log);
     }
 
     public String generarDescripcion(LocalDate desde, LocalDate hasta) {
-        DateTimeFormatter mesFormatter = DateTimeFormatter.ofPattern("MMMM", new Locale("es", "ES"));
+        DateTimeFormatter formatoDiaMes = DateTimeFormatter.ofPattern("d 'de' MMMM", new Locale("es", "ES"));
+        DateTimeFormatter formatoMes = DateTimeFormatter.ofPattern("MMMM", new Locale("es", "ES"));
 
-        String mesDesde = capitalize(desde.format(mesFormatter));
-        String mesHasta = capitalize(hasta.format(mesFormatter));
+        // Detectar si cubre todo el período laboral (21 al 20)
+        boolean periodoCompleto = desde.getDayOfMonth() == 21 && hasta.getDayOfMonth() == 20 &&
+                desde.plusMonths(1).getMonth() == hasta.getMonth();
 
-        // Si ambos meses son iguales, mostramos solo uno (caso raro si justo es dentro del mismo mes)
-        if (desde.getMonth().equals(hasta.getMonth())) {
-            return "Mes de " + mesDesde + " " + desde.getYear();
+        // Determinar mes laboral al que pertenece el rango
+        LocalDate mesLaboralReferencia = hasta.getDayOfMonth() >= 21
+                ? hasta.plusMonths(1)
+                : hasta;
+
+        String mesLaboral = capitalize(mesLaboralReferencia.format(formatoMes));
+        int anioLaboral = mesLaboralReferencia.getYear();
+
+        // Descripción adaptativa
+        if (periodoCompleto) {
+            return "Mes laboral " + mesLaboral + " " + anioLaboral;
+        } else {
+            String rango = "Semana del " + desde.format(formatoDiaMes) + " al " + hasta.format(formatoDiaMes);
+            return rango;
         }
-
-
-        // Caso normal: dos meses del mismo año
-        return "Planilla " + mesDesde + "-" + mesHasta;
     }
 
-    private String capitalize(String texto) {
-        return texto.substring(0, 1).toUpperCase() + texto.substring(1);
+    // Reutilizamos tu helper:
+    private String capitalize(String text) {
+        if (text == null || text.isEmpty()) return text;
+        return text.substring(0, 1).toUpperCase() + text.substring(1);
     }
 
 
@@ -157,6 +168,353 @@ public class ExcelService {
         return registros;
     }
 
+    public List<ResumenEmpleadoDTO> procesarAsistenciasTurnosNocturnos(
+            Empleado empleado,
+            List<RegistroAsistencia> registros,
+            LocalDate desde,
+            LocalDate hasta) {
+
+        // 1. ORDENAR TODOS LOS REGISTROS DE FORMA CONTINUA
+        List<RegistroAsistencia> registrosOrdenados = registros.stream()
+                .sorted(Comparator.comparing(RegistroAsistencia::getFecha)
+                        .thenComparing(RegistroAsistencia::getHora))
+                .toList();
+
+        List<ResumenEmpleadoDTO> detalle = new ArrayList<>();
+        DateTimeFormatter formatoLatino = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+        Locale localeEs = new Locale("es", "ES");
+
+        // 2. MAPA PARA CONTROLAR REGISTROS PROCESADOS
+        Set<Long> registrosProcesados = new HashSet<>();
+
+        // 3. DEFINIR HORARIOS NORMALES (según los nuevos requerimientos)
+        LocalTime[] inicioHorariosNormales = {
+                LocalTime.of(0, 0),   // 00:00
+                LocalTime.of(6, 0),   // 06:00
+                LocalTime.of(12, 0),  // 12:00
+                LocalTime.of(18, 0)   // 18:00
+        };
+
+        LocalTime[] finHorariosNormales = {
+                LocalTime.of(6, 0),   // 06:00
+                LocalTime.of(12, 0),  // 12:00
+                LocalTime.of(18, 0),  // 18:00
+                LocalTime.of(23, 59, 59) // 23:59:59
+        };
+
+        // 3. PROCESAR REGISTROS DE FORMA CONTINUA
+        for (int i = 0; i < registrosOrdenados.size(); i++) {
+            RegistroAsistencia entrada = registrosOrdenados.get(i);
+
+            // Si ya procesamos este registro, saltar
+            if (registrosProcesados.contains(entrada.getId())) {
+                continue;
+            }
+
+            // Buscar la salida correspondiente
+            RegistroAsistencia salida = null;
+            for (int j = i + 1; j < registrosOrdenados.size(); j++) {
+                RegistroAsistencia posibleSalida = registrosOrdenados.get(j);
+
+                // Si encontramos una salida que no ha sido procesada
+                if (!registrosProcesados.contains(posibleSalida.getId())) {
+                    salida = posibleSalida;
+                    break;
+                }
+            }
+
+            // Si no encontramos salida, es registro incompleto
+            if (salida == null) {
+                // AGREGAR REGISTRO INCOMPLETO
+                String nombreDia = entrada.getFecha().getDayOfWeek().getDisplayName(TextStyle.FULL, localeEs);
+                String fechaFormateada = entrada.getFecha().format(formatoLatino);
+                boolean faltaSalida = entrada.getOrdenDia() % 2 == 1;
+
+                String fotoBase64 = null;
+                if (entrada.getFoto() != null && entrada.getFoto().length > 0) {
+                    fotoBase64 = Base64.getEncoder().encodeToString(entrada.getFoto()).replaceAll("\\s+", "");
+                }
+
+                ResumenEmpleadoDTO dtoIncompleto = new ResumenEmpleadoDTO();
+                dtoIncompleto.setDni(empleado.getDni());
+                dtoIncompleto.setNombreCompleto(empleado.getNombre() + " " + empleado.getApellido());
+                dtoIncompleto.setFechaFormateada(fechaFormateada);
+                dtoIncompleto.setNombreDia(nombreDia);
+                dtoIncompleto.setMarcaIncompleta(true);
+                dtoIncompleto.setTipoIncompleto(faltaSalida ? "FALTA_SALIDA" : "FALTA_ENTRADA");
+                dtoIncompleto.setHoraEntrada(faltaSalida ? entrada.getHora() : null);
+                dtoIncompleto.setHoraSalida(faltaSalida ? null : entrada.getHora());
+                dtoIncompleto.setTipoHora("INCOMPLETO");
+                dtoIncompleto.setHorasTrabajadas(0);
+                dtoIncompleto.setAusente(false);
+                dtoIncompleto.setEsFeriado(feriadoService.esFeriado(entrada.getFecha()));
+                dtoIncompleto.setEsFinDeSemana(entrada.getFecha().getDayOfWeek() == DayOfWeek.SATURDAY || entrada.getFecha().getDayOfWeek() == DayOfWeek.SUNDAY);
+                dtoIncompleto.setJustificada(false);
+
+                if (faltaSalida) {
+                    dtoIncompleto.setFotoEntradaBase64(fotoBase64);
+                    dtoIncompleto.setFotoSalidaBase64(null);
+                } else {
+                    dtoIncompleto.setFotoEntradaBase64(null);
+                    dtoIncompleto.setFotoSalidaBase64(fotoBase64);
+                }
+
+                detalle.add(dtoIncompleto);
+                registrosProcesados.add(entrada.getId());
+                continue;
+            }
+
+            // VERIFICAR SI ES TURNO NOCTURNO
+            boolean esTurnoNocturno = false;
+            boolean entradaNoche = entrada.getHora().isAfter(LocalTime.of(18, 0));
+            boolean salidaManiana = salida.getHora().isBefore(LocalTime.of(12, 0));
+            boolean diasConsecutivos = salida.getFecha().equals(entrada.getFecha().plusDays(1));
+
+            if (entradaNoche && salidaManiana && diasConsecutivos) {
+                esTurnoNocturno = true;
+            }
+
+            // CALCULAR HORAS TRABAJADAS
+            double horas;
+            if (entrada.getHora().isBefore(salida.getHora())) {
+                horas = Duration.between(entrada.getHora(), salida.getHora()).toMinutes() / 60.0;
+            } else {
+                horas = Duration.between(entrada.getHora(), salida.getHora().plusHours(24)).toMinutes() / 60.0;
+            }
+
+            // PREPARAR DATOS BÁSICOS
+            String nombreDia = entrada.getFecha().getDayOfWeek().getDisplayName(TextStyle.FULL, localeEs);
+            String fechaFormateada = entrada.getFecha().format(formatoLatino);
+
+            String fotoEntradaBase64 = (entrada.getFoto() != null) ?
+                    Base64.getEncoder().encodeToString(entrada.getFoto()).replaceAll("\\s+", "") : null;
+            String fotoSalidaBase64 = (salida.getFoto() != null) ?
+                    Base64.getEncoder().encodeToString(salida.getFoto()).replaceAll("\\s+", "") : null;
+
+            // CALCULAR TIPO DE HORA Y EXTRAS
+            double horasNormales = 0;
+            double horasExtras = 0;
+            String tipoHora = "NORMAL";
+
+            boolean esFeriado = feriadoService.esFeriado(entrada.getFecha());
+            boolean esFinDeSemana = entrada.getFecha().getDayOfWeek() == DayOfWeek.SATURDAY ||
+                    entrada.getFecha().getDayOfWeek() == DayOfWeek.SUNDAY;
+            boolean esDiaSemana = !esFeriado && !esFinDeSemana;
+
+            // Si es feriado o fin de semana, todas las horas son extras
+            if (esFeriado || esFinDeSemana) {
+                tipoHora = esFeriado ? "FERIADO" : "FIN_SEMANA";
+                horasExtras = horas;
+            } else {
+                // Para días de semana, calcular horas normales según los horarios establecidos
+                LocalTime horaEntrada = entrada.getHora();
+                LocalTime horaSalida = salida.getHora();
+
+                // Si es turno nocturno que cruza medianoche
+                if (esTurnoNocturno) {
+                    LocalTime medianoche = LocalTime.of(0, 0);
+                    LocalTime inicioDiaSiguiente = LocalTime.of(0, 0);
+
+                    // Procesar horas del día de entrada (desde horaEntrada hasta medianoche)
+                    for (int k = 0; k < inicioHorariosNormales.length; k++) {
+                        LocalTime inicioRango = inicioHorariosNormales[k];
+                        LocalTime finRango = finHorariosNormales[k];
+
+                        // Calcular intersección con el rango actual
+                        LocalTime inicioInterseccion = horaEntrada.isAfter(inicioRango) ? horaEntrada : inicioRango;
+                        LocalTime finInterseccion = medianoche.isBefore(finRango) ? medianoche : finRango;
+
+                        if (inicioInterseccion.isBefore(finInterseccion)) {
+                            double horasEnRango = Duration.between(inicioInterseccion, finInterseccion).toMinutes() / 60.0;
+                            horasNormales += horasEnRango;
+                        }
+                    }
+
+                    // Procesar horas del día siguiente (desde inicioDiaSiguiente hasta horaSalida)
+                    for (int k = 0; k < inicioHorariosNormales.length; k++) {
+                        LocalTime inicioRango = inicioHorariosNormales[k];
+                        LocalTime finRango = finHorariosNormales[k];
+
+                        // Calcular intersección con el rango actual
+                        LocalTime inicioInterseccion = inicioDiaSiguiente.isAfter(inicioRango) ? inicioDiaSiguiente : inicioRango;
+                        LocalTime finInterseccion = horaSalida.isBefore(finRango) ? horaSalida : finRango;
+
+                        if (inicioInterseccion.isBefore(finInterseccion)) {
+                            double horasEnRango = Duration.between(inicioInterseccion, finInterseccion).toMinutes() / 60.0;
+                            horasNormales += horasEnRango;
+                        }
+                    }
+                } else {
+                    // Turno normal dentro del mismo día
+                    for (int k = 0; k < inicioHorariosNormales.length; k++) {
+                        LocalTime inicioRango = inicioHorariosNormales[k];
+                        LocalTime finRango = finHorariosNormales[k];
+
+                        // Calcular intersección entre el horario trabajado y el rango normal
+                        LocalTime inicioInterseccion = horaEntrada.isAfter(inicioRango) ? horaEntrada : inicioRango;
+                        LocalTime finInterseccion = horaSalida.isBefore(finRango) ? horaSalida : finRango;
+
+                        if (inicioInterseccion.isBefore(finInterseccion)) {
+                            double horasEnRango = Duration.between(inicioInterseccion, finInterseccion).toMinutes() / 60.0;
+                            horasNormales += horasEnRango;
+                        }
+                    }
+                }
+
+                // Las horas extras son la diferencia entre el total y las horas normales
+                horasExtras = Math.max(0, horas - horasNormales);
+
+                // Determinar tipo de hora
+                if (horasExtras > 0 && horasNormales > 0) {
+                    tipoHora = "MIXTO";
+                } else if (horasExtras > 0) {
+                    tipoHora = "EXTRA";
+                } else {
+                    tipoHora = "NORMAL";
+                }
+            }
+
+            // CALCULAR LLEGADA TARDE (10 minutos de flexibilidad)
+            boolean llegoTarde = false;
+            int minutosTarde = 0;
+            if (esDiaSemana) {
+                // Para calcular llegada tarde, necesitamos determinar el horario normal esperado
+                // Buscar en qué rango cae la hora de entrada
+                LocalTime horaEsperada = null;
+                for (int k = 0; k < inicioHorariosNormales.length; k++) {
+                    if (!entrada.getHora().isBefore(inicioHorariosNormales[k]) &&
+                            entrada.getHora().isBefore(finHorariosNormales[k])) {
+                        horaEsperada = inicioHorariosNormales[k];
+                        break;
+                    }
+                }
+
+                // Si no encontró rango, usar el primer horario del día
+                if (horaEsperada == null) {
+                    horaEsperada = inicioHorariosNormales[0];
+                }
+
+                // Aplicar flexibilidad de 10 minutos
+                LocalTime horaMaxima = horaEsperada.plusMinutes(10);
+                if (entrada.getHora().isAfter(horaMaxima)) {
+                    llegoTarde = true;
+                    minutosTarde = (int) Duration.between(horaMaxima, entrada.getHora()).toMinutes();
+                }
+            }
+
+            // VERIFICAR AUSENCIA
+            Ausencia ausenciaDia = null;
+            if (esDiaSemana) {
+                ausenciaDia = ausenciaService.obtenerAusenciaEmpleadoEnFecha(empleado, entrada.getFecha());
+            }
+
+            // CREAR DTO
+            ResumenEmpleadoDTO dto = new ResumenEmpleadoDTO();
+            dto.setDni(empleado.getDni());
+            dto.setNombreCompleto(empleado.getNombre() + " " + empleado.getApellido());
+            dto.setFechaFormateada(fechaFormateada);
+            dto.setNombreDia(nombreDia);
+            dto.setHoraEntrada(entrada.getHora());
+            dto.setHoraSalida(salida.getHora());
+            dto.setTipoHora(tipoHora);
+            dto.setHorasTrabajadas(horas);
+            dto.setMarcaIncompleta(false);
+            dto.setAusente(false);
+            dto.setLlegoTarde(llegoTarde);
+            dto.setMinutosTarde(minutosTarde);
+            dto.setEsFeriado(esFeriado);
+            dto.setEsFinDeSemana(esFinDeSemana);
+            dto.setJustificada(entrada.getJustificacion() != null);
+            dto.setHorasExtras(horasExtras);
+            dto.setHorasNormales(horasNormales);
+            dto.setFotoEntradaBase64(fotoEntradaBase64);
+            dto.setFotoSalidaBase64(fotoSalidaBase64);
+
+            // Manejar cruce de medianoche
+            if (esTurnoNocturno) {
+                dto.setMuestraCruceMedianoche(true);
+                dto.setHoraSalidaReal(salida.getHora());
+            }
+
+            // Si hay ausencia, marcamos el DTO
+            if (ausenciaDia != null) {
+                dto.setTipoDeAusencia(ausenciaDia.getTipoDeAusencia());
+                boolean tieneAusenciaJustificada = (ausenciaDia.getTipoDeAusencia() != Ausencia.TipoDeAusencia.FALTA_SIN_AVISO
+                        && ausenciaDia.getTipoDeAusencia() != Ausencia.TipoDeAusencia.NO_MARCO);
+                dto.setJustificada(tieneAusenciaJustificada);
+            }
+
+            detalle.add(dto);
+            registrosProcesados.add(entrada.getId());
+            registrosProcesados.add(salida.getId());
+        }
+
+        // 4. AGREGAR DÍAS SIN REGISTROS
+        Map<LocalDate, List<RegistroAsistencia>> registrosPorDia = registros.stream()
+                .collect(Collectors.groupingBy(RegistroAsistencia::getFecha));
+
+        LocalDate actual = desde;
+        while (!actual.isAfter(hasta)) {
+            if (!registrosPorDia.containsKey(actual)) {
+                String nombreDia = actual.getDayOfWeek().getDisplayName(TextStyle.FULL, localeEs);
+                String fechaFormateada = actual.format(formatoLatino);
+
+                boolean esFeriado = feriadoService.esFeriado(actual);
+                boolean esFinDeSemana = actual.getDayOfWeek() == DayOfWeek.SATURDAY || actual.getDayOfWeek() == DayOfWeek.SUNDAY;
+                boolean esLaboral = !esFeriado && !esFinDeSemana;
+
+                ResumenEmpleadoDTO dto = new ResumenEmpleadoDTO();
+                dto.setDni(empleado.getDni());
+                dto.setNombreCompleto(empleado.getNombre() + " " + empleado.getApellido());
+                dto.setFechaFormateada(fechaFormateada);
+                dto.setNombreDia(nombreDia);
+                dto.setHorasTrabajadas(0);
+                dto.setEsFeriado(esFeriado);
+                dto.setEsFinDeSemana(esFinDeSemana);
+
+                if (esLaboral) {
+                    Ausencia ausencia = ausenciaService.obtenerAusenciaEmpleadoEnFecha(empleado, actual);
+                    if (ausencia != null && ausencia.getTipoDeAusencia() != Ausencia.TipoDeAusencia.FALTA_SIN_AVISO) {
+                        dto.setTipoHora("NORMAL");
+                        dto.setAusente(false);
+                        dto.setJustificada(true);
+                        dto.setTipoDeAusencia(ausencia.getTipoDeAusencia());
+
+                        // Calcular horas normales como jornada completa (8 horas)
+                        dto.setHorasTrabajadas(8.0);
+                        dto.setHorasNormales(8.0);
+                    } else {
+                        dto.setTipoHora("AUSENTE");
+                        dto.setAusente(true);
+                        dto.setJustificada(false);
+                        dto.setTipoDeAusencia(Ausencia.TipoDeAusencia.FALTA_SIN_AVISO);
+                    }
+                } else {
+                    dto.setTipoHora(esFeriado ? "FERIADO" : "FIN_SEMANA");
+                    dto.setAusente(false);
+                    dto.setJustificada(false);
+                }
+
+                detalle.add(dto);
+            }
+            actual = actual.plusDays(1);
+        }
+
+        // 5. CALCULAR PRESENTISMO
+        boolean tieneAusenciaQueQuitaPresentismo = detalle.stream().anyMatch(dto -> {
+            Ausencia.TipoDeAusencia tipo = dto.getTipoDeAusencia();
+            return tipo != null
+                    && tipo != Ausencia.TipoDeAusencia.VACACIONES
+                    && tipo != Ausencia.TipoDeAusencia.NO_MARCO;
+        });
+
+        int totalMinutosTarde = detalle.stream().mapToInt(ResumenEmpleadoDTO::getMinutosTarde).sum();
+        boolean presentismo = !(tieneAusenciaQueQuitaPresentismo || totalMinutosTarde > 30);
+
+        detalle.forEach(dto -> dto.setPresentismo(presentismo));
+
+        return detalle;
+    }
 
     public List<ResumenEmpleadoDTO> procesarAsistenciasEmpleado(
             Empleado empleado,
@@ -181,6 +539,9 @@ public class ExcelService {
         int diasTrabajados = 0;
         int minutosTardeTotales = 0;
         int totalIncompletos = 0;
+        int totalFaltasConAviso = 0;
+        int totalAusenciasJustificadas = 0;
+        int totalVacaciones = 0;
 
         LocalDate actual = desde;
 
@@ -432,6 +793,16 @@ public class ExcelService {
                         dto.setHorasTrabajadas(horasTrabajadasNormales);
                         totalNormales += horasTrabajadasNormales;
                         totalHoras += horasTrabajadasNormales;
+                        // CONTABILIZAR TIPOS DE AUSENCIA JUSTIFICADA
+                        if (ausenciaDia.getTipoDeAusencia() == Ausencia.TipoDeAusencia.FALTA_CON_AVISO) {
+                            totalFaltasConAviso++;
+                        } else if (ausenciaDia.getTipoDeAusencia() == Ausencia.TipoDeAusencia.VACACIONES) {
+                            totalVacaciones++;
+                        } else if (ausenciaDia.getTipoDeAusencia() == Ausencia.TipoDeAusencia.JUSTIFICADA) {
+                            totalAusenciasJustificadas++;
+                        }
+
+
                     } else {
                         // Día sin marcas y sin ausencia justificada - es ausencia real
                         dto.setTipoHora("AUSENTE");
@@ -455,14 +826,13 @@ public class ExcelService {
                 detalle.add(dto);
             }
 
-            boolean trabajoEseDia = tieneHorasReales || tieneHorasJustificadas || !marcasDelDia.isEmpty() || tieneAusenciaJustificada;
-            if (trabajoEseDia
-                    && !tieneMarcasIncompletas
-                    && (ausenciaDia == null
+            boolean trabajoEseDia = tieneHorasReales || !marcasDelDia.isEmpty();
+            if (trabajoEseDia && (ausenciaDia == null
                     || (ausenciaDia.getTipoDeAusencia() != Ausencia.TipoDeAusencia.FALTA_SIN_AVISO
                     && ausenciaDia.getTipoDeAusencia() != Ausencia.TipoDeAusencia.FALTA_CON_AVISO))) {
                 diasTrabajados++;
             }
+
 
             actual = actual.plusDays(1);
         }
@@ -492,7 +862,19 @@ public class ExcelService {
         Empleado empleado = empleadoRepo.findByDni(dni).orElseThrow();
         List<RegistroAsistencia> registros = registroRepository.findByEmpleadoDniAndFechaBetween(dni, desde, hasta);
 
-        List<ResumenEmpleadoDTO> detalle = procesarAsistenciasEmpleado(empleado, registros, desde, hasta);
+        // DECIDIR QUÉ MÉTODO USAR SEGÚN EL ÁREA
+        List<ResumenEmpleadoDTO> detalle;
+        boolean esAreaHogarAdultosMayores = empleado.getArea() != null &&
+                "Hogar de Adultos Mayores".equals(empleado.getArea().getNombre());
+
+        if (esAreaHogarAdultosMayores) {
+            detalle = procesarAsistenciasTurnosNocturnos(empleado, registros, desde, hasta);
+            System.out.println("Area Hogar ENCONTRADA");
+            System.out.println(empleado.getArea().getNombre());
+
+        } else {
+            detalle = procesarAsistenciasEmpleado(empleado, registros, desde, hasta);
+        }
 
         Map<String, Object> resultado = new HashMap<>();
         resultado.put("detalle", detalle);
@@ -500,6 +882,7 @@ public class ExcelService {
         resultado.put("desde", desde);
         resultado.put("hasta", hasta);
         resultado.put("dniSeleccionado", dni);
+        resultado.put("esTurnoNocturno", esAreaHogarAdultosMayores); // Agregar esta info
 
         // Filtramos registros válidos para los cálculos
         List<ResumenEmpleadoDTO> registrosValidos = detalle.stream()
@@ -541,6 +924,26 @@ public class ExcelService {
                 .mapToDouble(ResumenEmpleadoDTO::getHorasTrabajadas)
                 .sum();
 
+        // NUEVOS TOTALES PARA AUSENCIAS
+        long totalFaltasConAviso = detalle.stream()
+                .filter(d -> d.getTipoDeAusencia() == Ausencia.TipoDeAusencia.FALTA_CON_AVISO)
+                .count();
+
+        long totalVacaciones = detalle.stream()
+                .filter(d -> d.getTipoDeAusencia() == Ausencia.TipoDeAusencia.VACACIONES)
+                .count();
+
+        long totalAusenciasJustificadas = detalle.stream()
+                .filter(d -> {
+                    Ausencia.TipoDeAusencia tipo = d.getTipoDeAusencia();
+                    return tipo != null &&
+                            tipo != Ausencia.TipoDeAusencia.FALTA_SIN_AVISO &&
+                            tipo != Ausencia.TipoDeAusencia.FALTA_CON_AVISO &&
+                            tipo != Ausencia.TipoDeAusencia.VACACIONES &&
+                            tipo != Ausencia.TipoDeAusencia.NO_MARCO;
+                })
+                .count();
+
         // Resto del código igual...
         List<ResumenEmpleadoDTO> ausencias = detalle.stream()
                 .filter(d -> {
@@ -564,7 +967,16 @@ public class ExcelService {
                 .filter(d -> {
                     boolean tieneMarcas = d.getHoraEntrada() != null || d.getHoraSalida() != null;
                     boolean esValido = !d.isMarcaIncompleta() && !"INVALIDO".equals(d.getTipoHora());
-                    return tieneMarcas && esValido;
+                    boolean tieneHorasReales = d.getHorasTrabajadas() > 0 && !d.isJustificada();
+
+                    boolean trabajoEseDia = tieneHorasReales || tieneMarcas;
+
+                    // No debe tener faltas con aviso ni sin aviso
+                    boolean sinFaltasInvalidas = d.getTipoDeAusencia() == null
+                            || (d.getTipoDeAusencia() != Ausencia.TipoDeAusencia.FALTA_SIN_AVISO
+                            && d.getTipoDeAusencia() != Ausencia.TipoDeAusencia.FALTA_CON_AVISO);
+
+                    return esValido && trabajoEseDia && sinFaltasInvalidas;
                 })
                 .map(ResumenEmpleadoDTO::getFechaFormateada)
                 .distinct()
@@ -586,6 +998,12 @@ public class ExcelService {
         resultado.put("diasTrabajados", diasTrabajados);
         resultado.put("minutosTardeTotales", minutosTardeTotales);
         resultado.put("totalAusencias", totalAusencias);
+
+        // AGREGAR LOS NUEVOS TOTALES AL RESULTADO
+        resultado.put("totalFaltasConAviso", totalFaltasConAviso);
+        resultado.put("totalVacaciones", totalVacaciones);
+        resultado.put("totalAusenciasJustificadas", totalAusenciasJustificadas);
+
         resultado.put("detalle", detalle);
 
         return resultado;
@@ -621,8 +1039,14 @@ public class ExcelService {
             double totalFindeFeriado = datos.get("totalFindeFeriado") != null ? (double) datos.get("totalFindeFeriado") : 0.0;
             long totalAusencias = datos.get("totalAusencias") != null ? (long) datos.get("totalAusencias") : 0L;
             long totalLlegadasTarde = datos.get("totalLlegadasTarde") != null ? (long) datos.get("totalLlegadasTarde") : 0L;
-            boolean presentismo = datos.get("presentismoEmpleado") != null ? (boolean) datos.get("presentismoEmpleado") : false;
+            boolean presentismo = datos.get("presentismoEmpleado") != null && (boolean) datos.get("presentismoEmpleado");
 
+            // NUEVOS TOTALES DE AUSENCIAS
+            long totalFaltasConAviso = datos.get("totalFaltasConAviso") != null ? (long) datos.get("totalFaltasConAviso") : 0L;
+            long totalVacaciones = datos.get("totalVacaciones") != null ? (long) datos.get("totalVacaciones") : 0L;
+            long totalAusenciasJustificadas = datos.get("totalAusenciasJustificadas") != null ? (long) datos.get("totalAusenciasJustificadas") : 0L;
+
+            // Actualizar el constructor de ResumenAsistenciasDTO para incluir los nuevos campos
             ResumenAsistenciasDTO dto = new ResumenAsistenciasDTO(
                     empleado.getDni(),
                     empleado.getNombre(),
@@ -635,7 +1059,10 @@ public class ExcelService {
                     totalLlegadasTarde,
                     empleado.getTipoContrato(),
                     presentismo,
-                    tieneMarcasIncompletas  // Nuevo campo
+                    tieneMarcasIncompletas,
+                    totalFaltasConAviso,      // Nuevo campo
+                    totalVacaciones,          // Nuevo campo
+                    totalAusenciasJustificadas // Nuevo campo
             );
 
             resumen.add(dto);
@@ -717,6 +1144,66 @@ public class ExcelService {
         }
 
         return dto;
+    }
+
+    public List<ResumenAsistenciasDTO> generarResumenTotalesPorFechas(LocalDate desde, LocalDate hasta, Empleado.TipoContrato tipoContrato) {
+
+        List<Empleado> empleados = tipoContrato != null
+                ? empleadoRepo.findByTipoContrato(tipoContrato)
+                : empleadoRepo.findAll();
+        empleados.sort(Comparator.comparing(Empleado::getApellido));
+
+        List<ResumenAsistenciasDTO> resumen = new ArrayList<>();
+
+        for (Empleado empleado : empleados) {
+            Map<String, Object> datos = generarDetalleEmpleadoView(empleado.getDni(), desde, hasta);
+            List<ResumenEmpleadoDTO> detalle = (List<ResumenEmpleadoDTO>) datos.get("detalle");
+
+            boolean tieneMarcasIncompletas = detalle.stream()
+                    .anyMatch(ResumenEmpleadoDTO::isMarcaIncompleta);
+
+            double totalHoras = datos.get("totalHoras") != null ? (double) datos.get("totalHoras") : 0.0;
+            double totalNormales = datos.get("totalNormales") != null ? (double) datos.get("totalNormales") : 0.0;
+            double totalExtras = datos.get("totalExtras") != null ? (double) datos.get("totalExtras") : 0.0;
+            double totalFindeFeriado = datos.get("totalFindeFeriado") != null ? (double) datos.get("totalFindeFeriado") : 0.0;
+            long totalAusencias = datos.get("totalAusencias") != null ? (long) datos.get("totalAusencias") : 0L;
+            long totalLlegadasTarde = datos.get("totalLlegadasTarde") != null ? (long) datos.get("totalLlegadasTarde") : 0L;
+            boolean presentismo = datos.get("presentismoEmpleado") != null && (boolean) datos.get("presentismoEmpleado");
+            // NUEVOS TOTALES DE AUSENCIAS
+            long totalFaltasConAviso = datos.get("totalFaltasConAviso") != null ? (long) datos.get("totalFaltasConAviso") : 0L;
+            long totalVacaciones = datos.get("totalVacaciones") != null ? (long) datos.get("totalVacaciones") : 0L;
+            long totalAusenciasJustificadas = datos.get("totalAusenciasJustificadas") != null ? (long) datos.get("totalAusenciasJustificadas") : 0L;
+
+            ResumenAsistenciasDTO dto = new ResumenAsistenciasDTO(
+                    empleado.getDni(),
+                    empleado.getNombre(),
+                    empleado.getApellido(),
+                    totalHoras,
+                    totalNormales,
+                    totalExtras,
+                    totalFindeFeriado,
+                    totalAusencias,
+                    totalLlegadasTarde,
+                    empleado.getTipoContrato(),
+                    presentismo,
+                    tieneMarcasIncompletas,
+                    totalFaltasConAviso,      // Nuevo campo
+                    totalVacaciones,          // Nuevo campo
+                    totalAusenciasJustificadas // Nuevo campo
+            );
+
+            resumen.add(dto);
+        }
+
+        return resumen;
+    }
+
+    public List<ResumenAsistenciasDTO> generarResumenTotalesPorRango(
+            LocalDate desde,
+            LocalDate hasta,
+            Empleado.TipoContrato tipoContrato) {
+
+        return generarResumenTotalesPorFechas(desde, hasta, tipoContrato);
     }
 
 
