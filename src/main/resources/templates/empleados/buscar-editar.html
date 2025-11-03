@@ -65,13 +65,15 @@
 
                     <div class="col">
                         <label for="area" class="form-label">Área</label>
-                        <select id="area" name="area.id" class="form-select">
+                        <select id="area" name="area.id" class="form-select" required>
+                            <option value="">Seleccionar área</option>
                             <option th:each="a : ${areas}"
                                     th:value="${a.id}"
                                     th:text="${a.nombre}"
-                                    th:selected="${empleado.area != null} ? ${a.id} == ${empleado.area.id} : false">
+                                    th:selected="${empleado.area != null} ? (a.id == empleado.area.id) : false">
                             </option>
                         </select>
+
                     </div>
 
                     <div class="col">

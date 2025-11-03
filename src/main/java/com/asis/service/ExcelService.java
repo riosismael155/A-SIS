@@ -187,7 +187,7 @@ public class ExcelService {
         // 2. MAPA PARA CONTROLAR REGISTROS PROCESADOS
         Set<Long> registrosProcesados = new HashSet<>();
 
-        // 3. DEFINIR HORARIOS NORMALES (según los nuevos requerimientos)
+        // 3. DEFINIR HORARIOS NORMALES
         LocalTime[] inicioHorariosNormales = {
                 LocalTime.of(0, 0),   // 00:00
                 LocalTime.of(6, 0),   // 06:00
@@ -264,22 +264,57 @@ public class ExcelService {
                 continue;
             }
 
-            // VERIFICAR SI ES TURNO NOCTURNO
-            boolean esTurnoNocturno = false;
-            boolean entradaNoche = entrada.getHora().isAfter(LocalTime.of(18, 0));
-            boolean salidaManiana = salida.getHora().isBefore(LocalTime.of(12, 0));
-            boolean diasConsecutivos = salida.getFecha().equals(entrada.getFecha().plusDays(1));
+            // CORREGIR: CALCULAR HORAS TRABAJADAS - VERSIÓN MEJORADA
+            double horas;
+            LocalDateTime fechaHoraEntrada = LocalDateTime.of(entrada.getFecha(), entrada.getHora());
+            LocalDateTime fechaHoraSalida = LocalDateTime.of(salida.getFecha(), salida.getHora());
 
-            if (entradaNoche && salidaManiana && diasConsecutivos) {
-                esTurnoNocturno = true;
+            // CORRECIÓN PRINCIPAL: Si la salida es anterior a la entrada, asumimos cruce de medianoche
+            // Pero primero verificamos si realmente son del mismo día o días diferentes
+            boolean esMismoDia = entrada.getFecha().equals(salida.getFecha());
+            boolean salidaAnteriorAEntrada = salida.getHora().isBefore(entrada.getHora());
+
+            // Si es el mismo día pero la salida es anterior a la entrada, es un error de datos
+            // Si son días diferentes, manejamos el cruce de medianoche normalmente
+            if (!esMismoDia || (esMismoDia && salidaAnteriorAEntrada && salida.getFecha().isAfter(entrada.getFecha()))) {
+                // Para días diferentes, la salida siempre es después de la entrada
+                // Para mismo día con salida anterior, asumimos error y tratamos como cruce
+                if (esMismoDia && salidaAnteriorAEntrada) {
+                    fechaHoraSalida = fechaHoraSalida.plusDays(1);
+                }
             }
 
-            // CALCULAR HORAS TRABAJADAS
-            double horas;
-            if (entrada.getHora().isBefore(salida.getHora())) {
-                horas = Duration.between(entrada.getHora(), salida.getHora()).toMinutes() / 60.0;
-            } else {
-                horas = Duration.between(entrada.getHora(), salida.getHora().plusHours(24)).toMinutes() / 60.0;
+            Duration duracion = Duration.between(fechaHoraEntrada, fechaHoraSalida);
+            horas = duracion.toMinutes() / 60.0;
+
+            // Validar que las horas no sean negativas
+            if (horas < 0) {
+                // Si aún es negativo, forzar cálculo positivo asumiendo cruce de medianoche
+                fechaHoraSalida = LocalDateTime.of(salida.getFecha().plusDays(1), salida.getHora());
+                duracion = Duration.between(fechaHoraEntrada, fechaHoraSalida);
+                horas = duracion.toMinutes() / 60.0;
+            }
+
+            // Asegurar que horas no sea negativo
+            horas = Math.max(0, horas);
+
+            // VERIFICAR SI ES TURNO NOCTURNO - LÓGICA MEJORADA
+            boolean esTurnoNocturno = false;
+            LocalDate fechaSalida = salida.getFecha();
+            LocalDate fechaEntrada = entrada.getFecha();
+
+            // Caso 1: Entrada en un día y salida al día siguiente
+            if (fechaSalida.isAfter(fechaEntrada)) {
+                esTurnoNocturno = true;
+            }
+            // Caso 2: Mismo día pero entrada tarde y salida muy temprano del día siguiente (error en datos)
+            else if (entrada.getHora().isAfter(LocalTime.of(18, 0)) &&
+                    salida.getHora().isBefore(LocalTime.of(6, 0))) {
+                esTurnoNocturno = true;
+            }
+            // Caso 3: Mismo día con salida anterior a entrada (error de datos que indica cruce)
+            else if (salida.getHora().isBefore(entrada.getHora())) {
+                esTurnoNocturno = true;
             }
 
             // PREPARAR DATOS BÁSICOS
@@ -312,38 +347,30 @@ public class ExcelService {
 
                 // Si es turno nocturno que cruza medianoche
                 if (esTurnoNocturno) {
-                    LocalTime medianoche = LocalTime.of(0, 0);
+                    // Para turnos nocturnos, consideramos horarios específicos
+                    LocalTime inicioNoche = LocalTime.of(18, 0);
+                    LocalTime finNoche = LocalTime.of(6, 0); // del día siguiente
+
+                    // Dividir el cálculo en dos partes: día de entrada y día siguiente
+                    LocalTime medianoche = LocalTime.of(23, 59, 59);
                     LocalTime inicioDiaSiguiente = LocalTime.of(0, 0);
 
-                    // Procesar horas del día de entrada (desde horaEntrada hasta medianoche)
-                    for (int k = 0; k < inicioHorariosNormales.length; k++) {
-                        LocalTime inicioRango = inicioHorariosNormales[k];
-                        LocalTime finRango = finHorariosNormales[k];
+                    // Horas del día de entrada (desde horaEntrada hasta medianoche)
+                    LocalTime horaEntradaAjustada = horaEntrada.isBefore(inicioNoche) ? inicioNoche : horaEntrada;
+                    double horasDiaEntrada = Duration.between(horaEntradaAjustada, medianoche).toMinutes() / 60.0;
+                    horasDiaEntrada = Math.max(0, horasDiaEntrada);
 
-                        // Calcular intersección con el rango actual
-                        LocalTime inicioInterseccion = horaEntrada.isAfter(inicioRango) ? horaEntrada : inicioRango;
-                        LocalTime finInterseccion = medianoche.isBefore(finRango) ? medianoche : finRango;
+                    // Horas del día siguiente (desde inicioDiaSiguiente hasta horaSalida)
+                    LocalTime horaSalidaAjustada = horaSalida.isAfter(finNoche) ? finNoche : horaSalida;
+                    double horasDiaSiguiente = Duration.between(inicioDiaSiguiente, horaSalidaAjustada).toMinutes() / 60.0;
+                    horasDiaSiguiente = Math.max(0, horasDiaSiguiente);
 
-                        if (inicioInterseccion.isBefore(finInterseccion)) {
-                            double horasEnRango = Duration.between(inicioInterseccion, finInterseccion).toMinutes() / 60.0;
-                            horasNormales += horasEnRango;
-                        }
-                    }
+                    horasNormales = horasDiaEntrada + horasDiaSiguiente;
 
-                    // Procesar horas del día siguiente (desde inicioDiaSiguiente hasta horaSalida)
-                    for (int k = 0; k < inicioHorariosNormales.length; k++) {
-                        LocalTime inicioRango = inicioHorariosNormales[k];
-                        LocalTime finRango = finHorariosNormales[k];
+                    // Asegurar que no exceda el total y no sea negativa
+                    horasNormales = Math.min(horasNormales, horas);
+                    horasNormales = Math.max(0, horasNormales);
 
-                        // Calcular intersección con el rango actual
-                        LocalTime inicioInterseccion = inicioDiaSiguiente.isAfter(inicioRango) ? inicioDiaSiguiente : inicioRango;
-                        LocalTime finInterseccion = horaSalida.isBefore(finRango) ? horaSalida : finRango;
-
-                        if (inicioInterseccion.isBefore(finInterseccion)) {
-                            double horasEnRango = Duration.between(inicioInterseccion, finInterseccion).toMinutes() / 60.0;
-                            horasNormales += horasEnRango;
-                        }
-                    }
                 } else {
                     // Turno normal dentro del mismo día
                     for (int k = 0; k < inicioHorariosNormales.length; k++) {
@@ -514,6 +541,17 @@ public class ExcelService {
         detalle.forEach(dto -> dto.setPresentismo(presentismo));
 
         return detalle;
+    }
+
+    private void debugTurnoNocturno(RegistroAsistencia entrada, RegistroAsistencia salida,
+                                    double horas, double horasNormales, double horasExtras) {
+        System.out.println("=== DEBUG TURNO NOCTURNO ===");
+        System.out.println("Entrada: " + entrada.getFecha() + " " + entrada.getHora());
+        System.out.println("Salida: " + salida.getFecha() + " " + salida.getHora());
+        System.out.println("Horas totales: " + horas);
+        System.out.println("Horas normales: " + horasNormales);
+        System.out.println("Horas extras: " + horasExtras);
+        System.out.println("=============================");
     }
 
     public List<ResumenEmpleadoDTO> procesarAsistenciasEmpleado(
@@ -869,8 +907,7 @@ public class ExcelService {
 
         if (esAreaHogarAdultosMayores) {
             detalle = procesarAsistenciasTurnosNocturnos(empleado, registros, desde, hasta);
-            System.out.println("Area Hogar ENCONTRADA");
-            System.out.println(empleado.getArea().getNombre());
+
 
         } else {
             detalle = procesarAsistenciasEmpleado(empleado, registros, desde, hasta);

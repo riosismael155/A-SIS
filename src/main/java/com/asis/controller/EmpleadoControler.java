@@ -1,5 +1,6 @@
 package com.asis.controller;
 
+import com.asis.model.Area;
 import com.asis.model.Empleado;
 import com.asis.model.dto.BusquedaEmpleadoDTO;
 import com.asis.model.dto.EmpleadoDTO;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.time.LocalTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -63,11 +65,19 @@ public class EmpleadoControler {
 
     @GetMapping("/modificar")
     public String mostrarFormularioEdicion(Model model) {
-        model.addAttribute("empleado", new Empleado());  // Podés mandar un objeto vacío para bindear el formulario
+        model.addAttribute("empleado", new Empleado());  // Objeto vacío para bindear el formulario
         model.addAttribute("tiposContrato", Empleado.TipoContrato.values());
-        model.addAttribute("areas", areaRepo.findAll());
+
+        // Trae todas las áreas y las ordena alfabéticamente (ignorando mayúsculas/minúsculas)
+        List<Area> areas = areaRepo.findAll()
+                .stream()
+                .sorted(Comparator.comparing(Area::getNombre, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+
+        model.addAttribute("areas", areas);
         return "empleados/buscar-editar";
     }
+
 
     @PostMapping("/actualizar")
     public String actualizarEmpleado(@ModelAttribute Empleado empleado,

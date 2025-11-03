@@ -29,5 +29,11 @@ public interface JustificacionAusenciaRepository extends JpaRepository<Ausencia,
     List<Ausencia> buscarAusenciasPorEmpleado(@Param("empleadoId") Long empleadoId,
                                               @Param("tipoExcluido") Ausencia.TipoDeAusencia tipoExcluido);
 
+    @Query("SELECT a FROM Ausencia a JOIN FETCH a.empleado e ORDER BY a.id DESC")
+    List<Ausencia> findAllOrderByIdDesc();
+
+
+
+
 
 }

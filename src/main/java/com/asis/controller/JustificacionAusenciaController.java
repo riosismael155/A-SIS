@@ -25,20 +25,23 @@ public class JustificacionAusenciaController {
     private final EmpleadoRepository empleadoRepo;
     private final JustificacionAusenciaService justificacionService;
 
+
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'SUPERVISOR')")
     @GetMapping("/cargar")
     public String verPantallaJustificaciones(Model model) {
         model.addAttribute("empleados", empleadoRepo.findAll());
 
-        // Filtramos para que NO aparezca FALTA_SIN_AVISO
         List<Ausencia.TipoDeAusencia> tiposAusencia = Arrays.stream(Ausencia.TipoDeAusencia.values())
                 .filter(t -> t != Ausencia.TipoDeAusencia.FALTA_SIN_AVISO)
                 .toList();
         model.addAttribute("tiposAusencia", tiposAusencia);
 
-        model.addAttribute("justificaciones", justificacionService.listarJustificaciones());
-        return "asistencias/justificaciones"; // misma vista para formulario y lista
+        // 🔽 Usamos el nuevo método ordenado
+        model.addAttribute("justificaciones", justificacionService.listarJustificacionesOrdenadas());
+
+        return "asistencias/justificaciones";
     }
+
 
     @PostMapping("/guardar")
     public String justificarAusencia(@RequestParam("dni") String dni,

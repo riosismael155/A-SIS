@@ -122,6 +122,11 @@ public class JustificacionAusenciaService {
                 Ausencia.TipoDeAusencia.FALTA_SIN_AVISO
         );
     }
+    public List<Ausencia> listarJustificacionesOrdenadas() {
+        return justificacionRepo.findAllOrderByIdDesc();
+    }
+
+
 
 
 }
