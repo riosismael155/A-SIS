@@ -42,6 +42,9 @@
             <!-- Formulario de empleado -->
             <form id="formEditarEmpleado" th:action="@{/empleados/actualizar}" method="post" class="mt-4">
                 <input type="hidden" name="id" th:value="${empleado.id}">
+                <input type="hidden"
+                       name="usuario.id"
+                       th:value="${empleado.usuario != null ? empleado.usuario.id : ''}" />
 
                 <!-- Primera fila -->
                 <div class="row mb-3">
@@ -70,7 +73,7 @@
                             <option th:each="a : ${areas}"
                                     th:value="${a.id}"
                                     th:text="${a.nombre}"
-                                    th:selected="${empleado.area != null} ? (a.id == empleado.area.id) : false">
+                                    th:selected="${empleado.area != null ? a.id == empleado.area.id : false}">
                             </option>
                         </select>
 
@@ -105,13 +108,15 @@
                     <div class="col">
                         <label for="horaEntrada2" class="form-label">2da hora de entrada</label>
                         <input id="horaEntrada2" name="horaEntrada2" type="time" class="form-control"
-                               th:value="${empleado.horaEntrada2 != null} ? ${#temporals.format(empleado.horaEntrada2, 'HH:mm')} : ''">
+                               th:value="${empleado.horaEntrada2 != null ? #temporals.format(empleado.horaEntrada2, 'HH:mm') : ''}">
+
                     </div>
 
                     <div class="col">
                         <label for="horaSalida2" class="form-label">2da hora de salida</label>
                         <input id="horaSalida2" name="horaSalida2" type="time" class="form-control"
-                               th:value="${empleado.horaSalida2 != null} ? ${#temporals.format(empleado.horaSalida2, 'HH:mm')} : ''">
+                               th:value="${empleado.horaSalida2 != null ? #temporals.format(empleado.horaSalida2, 'HH:mm') : ''}">
+
                     </div>
 
                     <div class="col">

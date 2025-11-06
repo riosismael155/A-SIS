@@ -60,6 +60,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function setearDatosEmpleado(e) {
+
         const nombreInput = document.getElementById("nombre");
         const apellidoInput = document.getElementById("apellido");
         const dniInput = document.getElementById("dni");
@@ -69,27 +70,51 @@ document.addEventListener("DOMContentLoaded", function () {
         const hiddenIdInput = document.querySelector("#formEditarEmpleado input[name='id']");
         const areaSelect = document.getElementById("area");
         const tipoContratoSelect = document.getElementById("tipoContrato");
+
+        // Horarios secundarios
         const horaEntrada2Input = document.getElementById("horaEntrada2");
         const horaSalida2Input = document.getElementById("horaSalida2");
+        const horaEntrada3Input = document.getElementById("horaEntrada3");
+        const horaSalida3Input = document.getElementById("horaSalida3");
+        const horaEntrada4Input = document.getElementById("horaEntrada4");
+        const horaSalida4Input = document.getElementById("horaSalida4");
 
         if (nombreInput) nombreInput.value = e.nombre || "";
         if (apellidoInput) apellidoInput.value = e.apellido || "";
         if (dniInput) dniInput.value = e.dni || "";
+
         if (horaEntradaInput) horaEntradaInput.value = e.horaEntrada || "";
         if (horaSalidaInput) horaSalidaInput.value = e.horaSalida || "";
+
         if (horaEntrada2Input) horaEntrada2Input.value = e.horaEntrada2 || "";
         if (horaSalida2Input) horaSalida2Input.value = e.horaSalida2 || "";
+
+        if (horaEntrada3Input) horaEntrada3Input.value = e.horaEntrada3 || "";
+        if (horaSalida3Input) horaSalida3Input.value = e.horaSalida3 || "";
+
+        if (horaEntrada4Input) horaEntrada4Input.value = e.horaEntrada4 || "";
+        if (horaSalida4Input) horaSalida4Input.value = e.horaSalida4 || "";
+
         if (flexMinutosInput) flexMinutosInput.value = e.flexMinutos || "";
         if (hiddenIdInput) hiddenIdInput.value = e.id || "";
 
-        if (areaSelect && e.area && e.area.id) {
-            areaSelect.value = e.area.id;
+        // ✅ CORREGIDO: área usa areaId directamente
+        if (areaSelect && e.areaId) {
+            areaSelect.value = e.areaId;
         }
 
+        // ✅ Tipo de contrato
         if (tipoContratoSelect && e.tipoContrato) {
             tipoContratoSelect.value = e.tipoContrato;
         }
+
+        // ✅ Usuario (campo oculto)
+        const usuarioHidden = document.querySelector("input[name='usuario.id']");
+        if (usuarioHidden && e.usuarioId) {
+            usuarioHidden.value = e.usuarioId;
+        }
     }
+
 
     // Ocultar sugerencias si hacés clic fuera
     document.addEventListener("click", function (event) {

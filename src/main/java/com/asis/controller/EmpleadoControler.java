@@ -80,19 +80,33 @@ public class EmpleadoControler {
 
 
     @PostMapping("/actualizar")
-    public String actualizarEmpleado(@ModelAttribute Empleado empleado,
+    public String actualizarEmpleado(@ModelAttribute Empleado form,
                                      RedirectAttributes redirectAttrs,
                                      Model model) {
-        empleadoRepo.save(empleado);
+
+        // Traemos el empleado original desde la BD
+        Empleado original = empleadoRepo.findById(form.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Empleado no encontrado"));
+
+        // ✅ Preservamos el usuario asociado (clave para evitar perderlo)
+        form.setUsuario(original.getUsuario());
+
+        // ✅ Preservamos registros si los tenés en cascada (opcional pero recomendable)
+        form.setRegistros(original.getRegistros());
+
+        // ✅ Guardamos
+        empleadoRepo.save(form);
+
         redirectAttrs.addFlashAttribute("mensaje", "Empleado actualizado correctamente.");
 
-        // Para recargar el formulario con el empleado actualizado:
-        model.addAttribute("empleado", empleado);
+        // Volvemos a cargar datos para pantalla de edición
+        model.addAttribute("empleado", form);
         model.addAttribute("tiposContrato", Empleado.TipoContrato.values());
         model.addAttribute("areas", areaRepo.findAll());
 
-        return "empleados/buscar-editar";  // Mismo template para edición
+        return "empleados/buscar-editar";
     }
+
 
     @GetMapping("/{dni}")
     @ResponseBody
