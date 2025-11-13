@@ -42,11 +42,6 @@ public class EmpleadoControler {
     @GetMapping("/cargar")
     public String mostrarFormularioEmpleado(Model model) {
         Empleado empleado = new Empleado();
-        empleado.setHoraEntrada(LocalTime.of(7, 0));
-        empleado.setHoraSalida(LocalTime.of(13, 0));
-        empleado.setFlexMinutos(10);
-
-
         model.addAttribute("empleado", empleado);
         model.addAttribute("tiposContrato", Empleado.TipoContrato.values());
         model.addAttribute("areas", areaRepo.findAll()); // 👈 listado de áreas

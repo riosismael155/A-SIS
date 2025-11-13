@@ -40,6 +40,8 @@ public class Empleado {
     private LocalTime horaEntrada4;
     private LocalTime horaSalida4;
 
+    private boolean noCumpleHorarioNormal;
+
     // Empleado.java
     @ManyToOne
     @JoinColumn(name = "usuario_id")
@@ -62,10 +64,11 @@ public class Empleado {
     private Rol rol;
 
 
+
     public enum TipoContrato {
-        SERVICIO("Contrato de servicio"),
-        HORA("Contrato prestacional"),
-        OBRA("Contrato de obra"),
+        SERVICIO("de Servicio"),
+        HORA("Prestacional"),
+        OBRA("de Obra"),
         PERMANENTE("Permanente");
 
         private final String label;

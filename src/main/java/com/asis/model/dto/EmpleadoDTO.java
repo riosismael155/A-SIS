@@ -22,7 +22,7 @@ public class EmpleadoDTO {
 
     private String horaEntrada4;
     private String horaSalida4;
-
+    private boolean noCumpleHorarioNormal;
     private Integer flexMinutos;
 
     private Long areaId;
@@ -46,7 +46,7 @@ public class EmpleadoDTO {
 
         this.horaEntrada3 = format(e.getHoraEntrada3());
         this.horaSalida3 = format(e.getHoraSalida3());
-
+        this.noCumpleHorarioNormal = e.isNoCumpleHorarioNormal();
         this.horaEntrada4 = format(e.getHoraEntrada4());
         this.horaSalida4 = format(e.getHoraSalida4());
 

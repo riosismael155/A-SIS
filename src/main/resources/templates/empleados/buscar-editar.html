@@ -76,7 +76,6 @@
                                     th:selected="${empleado.area != null ? a.id == empleado.area.id : false}">
                             </option>
                         </select>
-
                     </div>
 
                     <div class="col">
@@ -109,14 +108,12 @@
                         <label for="horaEntrada2" class="form-label">2da hora de entrada</label>
                         <input id="horaEntrada2" name="horaEntrada2" type="time" class="form-control"
                                th:value="${empleado.horaEntrada2 != null ? #temporals.format(empleado.horaEntrada2, 'HH:mm') : ''}">
-
                     </div>
 
                     <div class="col">
                         <label for="horaSalida2" class="form-label">2da hora de salida</label>
                         <input id="horaSalida2" name="horaSalida2" type="time" class="form-control"
                                th:value="${empleado.horaSalida2 != null ? #temporals.format(empleado.horaSalida2, 'HH:mm') : ''}">
-
                     </div>
 
                     <div class="col">
@@ -125,14 +122,27 @@
                                th:value="${empleado.flexMinutos}" readonly>
                     </div>
 
-                    <div class="col d-flex align-items-end">
-                        <button type="submit" class="btn-action btn-nowrap w-100">
-                            <i class="bi bi-save me-1"></i> Actualizar
-                        </button>
+                    <div class="col">
+                        <div class="form-check form-switch mt-4">
+                            <input id="noCumpleHorarioNormal" name="noCumpleHorarioNormal" type="checkbox"
+                                   class="form-check-input" role="switch"
+                                   th:checked="${empleado.noCumpleHorarioNormal}">
+                            <label for="noCumpleHorarioNormal" class="form-check-label">No cumple horario normal</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tercera fila - Solo el botón de actualizar -->
+                <div class="row mb-3">
+                    <div class="col-12">
+                        <div class="d-flex justify-content-end">
+                            <button type="submit" class="btn-action btn-nowrap">
+                                <i class="bi bi-save me-1"></i> Actualizar
+                            </button>
+                        </div>
                     </div>
                 </div>
             </form>
-
         </div>
     </div>
 </main>

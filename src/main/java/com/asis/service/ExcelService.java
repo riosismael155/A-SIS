@@ -168,7 +168,7 @@ public class ExcelService {
         return registros;
     }
 
-    public List<ResumenEmpleadoDTO> procesarAsistenciasTurnosNocturnos(
+    public List<ResumenEmpleadoDTO> procesarAsistenciasTurnosAnormales(
             Empleado empleado,
             List<RegistroAsistencia> registros,
             LocalDate desde,
@@ -187,15 +187,8 @@ public class ExcelService {
         // 2. MAPA PARA CONTROLAR REGISTROS PROCESADOS
         Set<Long> registrosProcesados = new HashSet<>();
 
-        // DEFINIR FRANJAS HORARIAS CON RANGOS MÁS ESPECÍFICOS
-        List<FranjaHoraria> franjasHorarias = Arrays.asList(
-                new FranjaHoraria("T1", LocalTime.of(6, 0), LocalTime.of(12, 0), 6, "MAÑANA"),
-                new FranjaHoraria("T2", LocalTime.of(12, 0), LocalTime.of(14, 0), 2, "TARDE"),
-                new FranjaHoraria("T3", LocalTime.of(14, 0), LocalTime.of(18, 0), 4, "TARDE_NOCHE"),
-                new FranjaHoraria("T4", LocalTime.of(18, 0), LocalTime.of(22, 0), 4, "NOCHE"),
-                new FranjaHoraria("T5", LocalTime.of(22, 0), LocalTime.of(0, 0), 2, "NOCHE_TARDIA"),
-                new FranjaHoraria("T6", LocalTime.of(0, 0), LocalTime.of(6, 0), 6, "MADRUGADA")
-        );
+        // 3. MAPA PARA CONTAR PARES POR DÍA
+        Map<LocalDate, Integer> contadorParesPorDia = new HashMap<>();
 
         // 3. PROCESAR REGISTROS DE FORMA CONTINUA
         for (int i = 0; i < registrosOrdenados.size(); i++) {
@@ -245,11 +238,8 @@ public class ExcelService {
                 dtoIncompleto.setEsFeriado(feriadoService.esFeriado(entrada.getFecha()));
                 dtoIncompleto.setEsFinDeSemana(entrada.getFecha().getDayOfWeek() == DayOfWeek.SATURDAY || entrada.getFecha().getDayOfWeek() == DayOfWeek.SUNDAY);
                 dtoIncompleto.setJustificada(false);
-                dtoIncompleto.setFranjaHorariaId("INDEFINIDO");
-                dtoIncompleto.setTipoFranjaHoraria("INCOMPLETO");
-                dtoIncompleto.setDuracionFranjaHoraria(0);
-                dtoIncompleto.setHoraInicioFranja(null);
-                dtoIncompleto.setHoraFinFranja(null);
+                dtoIncompleto.setHorasExtras(0);
+                dtoIncompleto.setHorasNormales(0);
 
                 if (faltaSalida) {
                     dtoIncompleto.setFotoEntradaBase64(fotoBase64);
@@ -264,16 +254,16 @@ public class ExcelService {
                 continue;
             }
 
-            // CALCULAR HORAS TRABAJADAS - VERSIÓN MEJORADA
+            // CALCULAR HORAS TRABAJADAS
             double horas;
             LocalDateTime fechaHoraEntrada = LocalDateTime.of(entrada.getFecha(), entrada.getHora());
             LocalDateTime fechaHoraSalida = LocalDateTime.of(salida.getFecha(), salida.getHora());
 
-            // CORRECIÓN PRINCIPAL: Si la salida es anterior a la entrada, asumimos cruce de medianoche
+            // CORRECIÓN: Si la salida es anterior a la entrada, asumimos cruce de medianoche
             boolean esMismoDia = entrada.getFecha().equals(salida.getFecha());
             boolean salidaAnteriorAEntrada = salida.getHora().isBefore(entrada.getHora());
 
-            if (!esMismoDia || (esMismoDia && salidaAnteriorAEntrada && salida.getFecha().isAfter(entrada.getFecha()))) {
+            if (!esMismoDia || (esMismoDia && salidaAnteriorAEntrada)) {
                 if (esMismoDia && salidaAnteriorAEntrada) {
                     fechaHoraSalida = fechaHoraSalida.plusDays(1);
                 }
@@ -292,13 +282,7 @@ public class ExcelService {
             // Asegurar que horas no sea negativo
             horas = Math.max(0, horas);
 
-            // DETERMINAR FRANJA HORARIA USANDO EL SISTEMA MEJORADO
-            FranjaHoraria franjaPrincipal = determinarFranjaHorariaExclusiva(entrada.getHora(), salida.getHora(), franjasHorarias);
-
-            String franjaId = franjaPrincipal != null ? franjaPrincipal.getId() : "INDEFINIDO";
-            String tipoFranja = franjaPrincipal != null ? franjaPrincipal.getTipo() : "INDEFINIDO";
-
-            // VERIFICAR SI ES TURNO NOCTURNO - LÓGICA MEJORADA
+            // VERIFICAR SI ES TURNO NOCTURNO
             boolean esTurnoNocturno = false;
             LocalDate fechaSalida = salida.getFecha();
             LocalDate fechaEntrada = entrada.getFecha();
@@ -307,12 +291,7 @@ public class ExcelService {
             if (fechaSalida.isAfter(fechaEntrada)) {
                 esTurnoNocturno = true;
             }
-            // Caso 2: Mismo día pero entrada tarde y salida muy temprano del día siguiente (error en datos)
-            else if (entrada.getHora().isAfter(LocalTime.of(18, 0)) &&
-                    salida.getHora().isBefore(LocalTime.of(6, 0))) {
-                esTurnoNocturno = true;
-            }
-            // Caso 3: Mismo día con salida anterior a entrada (error de datos que indica cruce)
+            // Caso 2: Mismo día con salida anterior a entrada (error de datos que indica cruce)
             else if (salida.getHora().isBefore(entrada.getHora())) {
                 esTurnoNocturno = true;
             }
@@ -326,7 +305,7 @@ public class ExcelService {
             String fotoSalidaBase64 = (salida.getFoto() != null) ?
                     Base64.getEncoder().encodeToString(salida.getFoto()).replaceAll("\\s+", "") : null;
 
-            // CALCULAR TIPO DE HORA Y EXTRAS
+            // NUEVA LÓGICA: CALCULAR HORAS NORMALES Y EXTRAS
             double horasNormales = 0;
             double horasExtras = 0;
             String tipoHora = "NORMAL";
@@ -334,73 +313,49 @@ public class ExcelService {
             boolean esFeriado = feriadoService.esFeriado(entrada.getFecha());
             boolean esFinDeSemana = entrada.getFecha().getDayOfWeek() == DayOfWeek.SATURDAY ||
                     entrada.getFecha().getDayOfWeek() == DayOfWeek.SUNDAY;
-            boolean esDiaSemana = !esFeriado && !esFinDeSemana;
+
+            // CONTAR PARES POR DÍA
+            LocalDate fechaDia = entrada.getFecha();
+            int numeroPar = contadorParesPorDia.getOrDefault(fechaDia, 0) + 1;
+            contadorParesPorDia.put(fechaDia, numeroPar);
 
             // Si es feriado o fin de semana, todas las horas son extras
             if (esFeriado || esFinDeSemana) {
                 tipoHora = esFeriado ? "FERIADO" : "FIN_SEMANA";
                 horasExtras = horas;
+                horasNormales = 0;
             } else {
-                // Para días de semana, calcular horas normales según las franjas horarias
-                LocalTime horaEntrada = entrada.getHora();
-                LocalTime horaSalida = salida.getHora();
+                // PARA DÍAS DE SEMANA - NUEVA LÓGICA
 
-                // Si es turno nocturno que cruza medianoche
-                if (esTurnoNocturno) {
-                    // Para turnos nocturnos, usar la franja específica para cálculo
-                    if (franjaPrincipal != null && franjaPrincipal.esNocturna()) {
-                        // Calcular horas dentro de la franja nocturna
-                        horasNormales = calcularHorasEnFranjaNocturna(horaEntrada, horaSalida, franjaPrincipal);
-                    } else {
-                        // Cálculo genérico para turnos nocturnos
-                        horasNormales = calcularHorasNormalesNocturnas(horaEntrada, horaSalida, franjasHorarias);
-                    }
-                } else {
-                    // Turno normal dentro del mismo día - calcular horas en cada franja
-                    for (FranjaHoraria franja : franjasHorarias) {
-                        double horasEnFranja = franja.calcularHorasEnFranja(horaEntrada, horaSalida);
-                        horasNormales += horasEnFranja;
-                    }
-                }
-
-                // Limitar horas normales al total trabajado y asegurar no sean negativas
-                horasNormales = Math.min(horasNormales, horas);
-                horasNormales = Math.max(0, horasNormales);
-
-                // Las horas extras son la diferencia entre el total y las horas normales
-                horasExtras = Math.max(0, horas - horasNormales);
-
-                // Determinar tipo de hora
-                if (horasExtras > 0 && horasNormales > 0) {
-                    tipoHora = "MIXTO";
-                } else if (horasExtras > 0) {
+                // Caso 1: Segundo par o posterior - 100% extras
+                if (numeroPar >= 2) {
+                    horasExtras = horas;
+                    horasNormales = 0;
                     tipoHora = "EXTRA";
-                } else {
-                    tipoHora = "NORMAL";
+                }
+                // Caso 2: Primer par - hasta 6 horas normales, después extras
+                else {
+                    if (horas <= 6) {
+                        // Hasta 6 horas: 100% normales
+                        horasNormales = horas;
+                        horasExtras = 0;
+                        tipoHora = "NORMAL";
+                    } else {
+                        // Más de 6 horas: primeras 6 normales, resto extras
+                        horasNormales = 6;
+                        horasExtras = horas - 6;
+                        tipoHora = "MIXTO";
+                    }
                 }
             }
 
-            // CALCULAR LLEGADA TARDE BASADA EN LA FRANJA DETERMINADA
-            boolean llegoTarde = false;
-            int minutosTarde = 0;
-            if (esDiaSemana && franjaPrincipal != null) {
-                LocalTime horaEsperada = franjaPrincipal.getHoraInicio();
-
-                // Aplicar flexibilidad de 10 minutos
-                LocalTime horaMaxima = horaEsperada.plusMinutes(10);
-                if (entrada.getHora().isAfter(horaMaxima)) {
-                    llegoTarde = true;
-                    minutosTarde = (int) Duration.between(horaMaxima, entrada.getHora()).toMinutes();
-                }
-            }
-
-            // VERIFICAR AUSENCIA
+            // VERIFICAR AUSENCIA - SOLO PARA EMPLEADOS QUE CUMPLEN HORARIO NORMAL
             Ausencia ausenciaDia = null;
-            if (esDiaSemana) {
+            if (!esFeriado && !esFinDeSemana && !empleado.isNoCumpleHorarioNormal()) {
                 ausenciaDia = ausenciaService.obtenerAusenciaEmpleadoEnFecha(empleado, entrada.getFecha());
             }
 
-            // CREAR DTO
+// CREAR DTO
             ResumenEmpleadoDTO dto = new ResumenEmpleadoDTO();
             dto.setDni(empleado.getDni());
             dto.setNombreCompleto(empleado.getNombre() + " " + empleado.getApellido());
@@ -411,9 +366,9 @@ public class ExcelService {
             dto.setTipoHora(tipoHora);
             dto.setHorasTrabajadas(horas);
             dto.setMarcaIncompleta(false);
-            dto.setAusente(false);
-            dto.setLlegoTarde(llegoTarde);
-            dto.setMinutosTarde(minutosTarde);
+            dto.setAusente(false); // Siempre false para empleados sin horario normal
+            dto.setLlegoTarde(false);
+            dto.setMinutosTarde(0);
             dto.setEsFeriado(esFeriado);
             dto.setEsFinDeSemana(esFinDeSemana);
             dto.setJustificada(entrada.getJustificacion() != null);
@@ -421,17 +376,15 @@ public class ExcelService {
             dto.setHorasNormales(horasNormales);
             dto.setFotoEntradaBase64(fotoEntradaBase64);
             dto.setFotoSalidaBase64(fotoSalidaBase64);
-            dto.setFranjaHorariaId(franjaId);
-            dto.setTipoFranjaHoraria(tipoFranja);
 
-            // Manejar cruce de medianoche
+// Manejar cruce de medianoche
             if (esTurnoNocturno) {
                 dto.setMuestraCruceMedianoche(true);
                 dto.setHoraSalidaReal(salida.getHora());
             }
 
-            // Si hay ausencia, marcamos el DTO
-            if (ausenciaDia != null) {
+// Si hay ausencia Y el empleado CUMPLE horario normal, marcamos el DTO
+            if (ausenciaDia != null && !empleado.isNoCumpleHorarioNormal()) {
                 dto.setTipoDeAusencia(ausenciaDia.getTipoDeAusencia());
                 boolean tieneAusenciaJustificada = (ausenciaDia.getTipoDeAusencia() != Ausencia.TipoDeAusencia.FALTA_SIN_AVISO
                         && ausenciaDia.getTipoDeAusencia() != Ausencia.TipoDeAusencia.NO_MARCO);
@@ -465,23 +418,33 @@ public class ExcelService {
                 dto.setHorasTrabajadas(0);
                 dto.setEsFeriado(esFeriado);
                 dto.setEsFinDeSemana(esFinDeSemana);
+                dto.setHorasExtras(0);
+                dto.setHorasNormales(0);
 
                 if (esLaboral) {
-                    Ausencia ausencia = ausenciaService.obtenerAusenciaEmpleadoEnFecha(empleado, actual);
-                    if (ausencia != null && ausencia.getTipoDeAusencia() != Ausencia.TipoDeAusencia.FALTA_SIN_AVISO) {
+                    // SOLO BUSCAR AUSENCIAS SI EL EMPLEADO CUMPLE HORARIO NORMAL
+                    if (!empleado.isNoCumpleHorarioNormal()) {
+                        Ausencia ausencia = ausenciaService.obtenerAusenciaEmpleadoEnFecha(empleado, actual);
+                        if (ausencia != null && ausencia.getTipoDeAusencia() != Ausencia.TipoDeAusencia.FALTA_SIN_AVISO) {
+                            dto.setTipoHora("NORMAL");
+                            dto.setAusente(false);
+                            dto.setJustificada(true);
+                            dto.setTipoDeAusencia(ausencia.getTipoDeAusencia());
+                            dto.setHorasTrabajadas(8.0);
+                            dto.setHorasNormales(8.0);
+                        } else {
+                            dto.setTipoHora("AUSENTE");
+                            dto.setAusente(true);
+                            dto.setJustificada(false);
+                            dto.setTipoDeAusencia(Ausencia.TipoDeAusencia.FALTA_SIN_AVISO);
+                        }
+                    } else {
+                        // PARA EMPLEADOS SIN HORARIO NORMAL: día sin registros es normal
                         dto.setTipoHora("NORMAL");
                         dto.setAusente(false);
-                        dto.setJustificada(true);
-                        dto.setTipoDeAusencia(ausencia.getTipoDeAusencia());
-
-                        // Calcular horas normales según la jornada estándar (8 horas)
-                        dto.setHorasTrabajadas(8.0);
-                        dto.setHorasNormales(8.0);
-                    } else {
-                        dto.setTipoHora("AUSENTE");
-                        dto.setAusente(true);
                         dto.setJustificada(false);
-                        dto.setTipoDeAusencia(Ausencia.TipoDeAusencia.FALTA_SIN_AVISO);
+                        dto.setHorasTrabajadas(0);
+                        dto.setHorasNormales(0);
                     }
                 } else {
                     dto.setTipoHora(esFeriado ? "FERIADO" : "FIN_SEMANA");
@@ -494,7 +457,7 @@ public class ExcelService {
             actual = actual.plusDays(1);
         }
 
-        // 5. CALCULAR PRESENTISMO
+        // 5. CALCULAR PRESENTISMO (sin considerar tardanzas)
         boolean tieneAusenciaQueQuitaPresentismo = detalle.stream().anyMatch(dto -> {
             Ausencia.TipoDeAusencia tipo = dto.getTipoDeAusencia();
             return tipo != null
@@ -502,156 +465,13 @@ public class ExcelService {
                     && tipo != Ausencia.TipoDeAusencia.NO_MARCO;
         });
 
-        int totalMinutosTarde = detalle.stream().mapToInt(ResumenEmpleadoDTO::getMinutosTarde).sum();
-        boolean presentismo = !(tieneAusenciaQueQuitaPresentismo || totalMinutosTarde > 30);
+        // Presentismo solo considera ausencias, no tardanzas
+        boolean presentismo = !tieneAusenciaQueQuitaPresentismo;
 
         detalle.forEach(dto -> dto.setPresentismo(presentismo));
 
         return detalle;
     }
-
-    // CLASE AUXILIAR PARA MANEJAR FRANJAS HORARIAS
-    class FranjaHoraria {
-        private String id;
-        private LocalTime horaInicio;
-        private LocalTime horaFin;
-        private int duracionHoras;
-        private String tipo;
-
-        public FranjaHoraria(String id, LocalTime horaInicio, LocalTime horaFin, int duracionHoras, String tipo) {
-            this.id = id;
-            this.horaInicio = horaInicio;
-            this.horaFin = horaFin;
-            this.duracionHoras = duracionHoras;
-            this.tipo = tipo;
-        }
-
-        public double calcularHorasEnFranja(LocalTime horaEntrada, LocalTime horaSalida) {
-            // Si la franja cruza medianoche (horaFin < horaInicio)
-            if (horaFin.isBefore(horaInicio)) {
-                return calcularHorasEnFranjaNocturna(horaEntrada, horaSalida);
-            }
-
-            // Franja normal
-            LocalTime inicioInterseccion = horaEntrada.isAfter(horaInicio) ? horaEntrada : horaInicio;
-            LocalTime finInterseccion = horaSalida.isBefore(horaFin) ? horaSalida : horaFin;
-
-            if (inicioInterseccion.isBefore(finInterseccion)) {
-                return Duration.between(inicioInterseccion, finInterseccion).toMinutes() / 60.0;
-            }
-            return 0;
-        }
-
-        private double calcularHorasEnFranjaNocturna(LocalTime horaEntrada, LocalTime horaSalida) {
-            double horas = 0;
-
-            // Parte del día actual (desde horaEntrada hasta medianoche)
-            if (horaEntrada.isAfter(horaInicio) || horaEntrada.equals(horaInicio)) {
-                LocalTime finDiaActual = LocalTime.of(23, 59, 59);
-                LocalTime inicioCalculo = horaEntrada.isAfter(horaInicio) ? horaEntrada : horaInicio;
-                if (inicioCalculo.isBefore(finDiaActual)) {
-                    horas += Duration.between(inicioCalculo, finDiaActual).toMinutes() / 60.0;
-                }
-            }
-
-            // Parte del día siguiente (desde medianoche hasta horaSalida o horaFin)
-            LocalTime inicioDiaSiguiente = LocalTime.of(0, 0);
-            LocalTime finCalculo = horaSalida.isBefore(horaFin) ? horaSalida : horaFin;
-            if (finCalculo.isAfter(inicioDiaSiguiente)) {
-                horas += Duration.between(inicioDiaSiguiente, finCalculo).toMinutes() / 60.0;
-            }
-
-            return horas;
-        }
-
-        public boolean esNocturna() {
-            return horaFin.isBefore(horaInicio) ||
-                    horaInicio.getHour() >= 18 ||
-                    horaFin.getHour() <= 6;
-        }
-
-        // Getters
-        public String getId() { return id; }
-        public LocalTime getHoraInicio() { return horaInicio; }
-        public LocalTime getHoraFin() { return horaFin; }
-        public int getDuracionHoras() { return duracionHoras; }
-        public String getTipo() { return tipo; }
-    }
-
-    // NUEVO MÉTODO: DETERMINAR FRANJA HORARIA EXCLUSIVA SIN SOLAPAMIENTOS
-    private FranjaHoraria determinarFranjaHorariaExclusiva(LocalTime horaEntrada, LocalTime horaSalida, List<FranjaHoraria> franjas) {
-        // PRIMERO: Buscar por hora de entrada con prioridad de franjas exclusivas
-        FranjaHoraria franjaPorEntrada = determinarFranjaPorHoraEntradaExclusiva(horaEntrada, franjas);
-
-        // SEGUNDO: Si encontramos franja por entrada, verificar si coincide con el turno completo
-        if (franjaPorEntrada != null) {
-            double horasEnFranja = franjaPorEntrada.calcularHorasEnFranja(horaEntrada, horaSalida);
-            double horasTotales = Duration.between(horaEntrada, horaSalida).toMinutes() / 60.0;
-            if (horasTotales < 0) horasTotales += 24; // Ajustar para turnos nocturnos
-
-            // Si más del 60% del turno está en esta franja, usarla
-            if (horasEnFranja / horasTotales >= 0.6) {
-                return franjaPorEntrada;
-            }
-        }
-
-        // TERCERO: Buscar la franja con mayor coincidencia
-        return determinarFranjaPorMayorCoincidencia(horaEntrada, horaSalida, franjas);
-    }
-
-    // MÉTODO AUXILIAR: DETERMINAR FRANJA POR HORA DE ENTRADA (EXCLUSIVA)
-    private FranjaHoraria determinarFranjaPorHoraEntradaExclusiva(LocalTime horaEntrada, List<FranjaHoraria> franjas) {
-        for (FranjaHoraria franja : franjas) {
-            // Para franjas normales (sin cruce de medianoche)
-            if (!franja.esNocturna()) {
-                if (!horaEntrada.isBefore(franja.getHoraInicio()) &&
-                        horaEntrada.isBefore(franja.getHoraFin())) {
-                    return franja;
-                }
-            } else {
-                // Para franjas nocturnas (con cruce de medianoche)
-                if (horaEntrada.isAfter(franja.getHoraInicio()) ||
-                        horaEntrada.isBefore(franja.getHoraFin())) {
-                    return franja;
-                }
-            }
-        }
-        return null;
-    }
-
-    // MÉTODO AUXILIAR: DETERMINAR FRANJA POR MAYOR COINCIDENCIA
-    private FranjaHoraria determinarFranjaPorMayorCoincidencia(LocalTime horaEntrada, LocalTime horaSalida, List<FranjaHoraria> franjas) {
-        FranjaHoraria mejorFranja = null;
-        double maxHorasEnFranja = 0;
-
-        for (FranjaHoraria franja : franjas) {
-            double horasEnFranja = franja.calcularHorasEnFranja(horaEntrada, horaSalida);
-            if (horasEnFranja > maxHorasEnFranja) {
-                maxHorasEnFranja = horasEnFranja;
-                mejorFranja = franja;
-            }
-        }
-
-        return mejorFranja;
-    }
-
-    // MÉTODOS AUXILIARES EXISTENTES
-    private double calcularHorasEnFranjaNocturna(LocalTime horaEntrada, LocalTime horaSalida, FranjaHoraria franja) {
-        return franja.calcularHorasEnFranja(horaEntrada, horaSalida);
-    }
-
-    private double calcularHorasNormalesNocturnas(LocalTime horaEntrada, LocalTime horaSalida, List<FranjaHoraria> franjas) {
-        double horasNormales = 0;
-        for (FranjaHoraria franja : franjas) {
-            if (franja.esNocturna()) {
-                horasNormales += franja.calcularHorasEnFranja(horaEntrada, horaSalida);
-            }
-        }
-        return horasNormales;
-    }
-
-
-
 
 
     public List<ResumenEmpleadoDTO> procesarAsistenciasEmpleado(
@@ -704,7 +524,6 @@ public class ExcelService {
             if (esLaboral) {
                 ausenciaDia = ausenciaService.obtenerAusenciaEmpleadoEnFecha(empleado, actual);
                 if (ausenciaDia != null) {
-                    // Considerar como justificadas: VACACIONES, JUSTIFICADA, LICENCIA, etc. (todo excepto INJUSTIFICADA y NO_MARCO)
                     tieneAusenciaJustificada = (ausenciaDia.getTipoDeAusencia() != Ausencia.TipoDeAusencia.FALTA_SIN_AVISO
                             && ausenciaDia.getTipoDeAusencia() != Ausencia.TipoDeAusencia.NO_MARCO);
                 }
@@ -712,7 +531,7 @@ public class ExcelService {
 
             boolean tieneHorasJustificadas = false;
             boolean tieneHorasReales = false;
-            boolean esPrimeraMarca = true;
+            int numeroPar = 0; // Contador de pares de marcas
             boolean tieneMarcasIncompletas = false;
 
             // ---------- Manejo de marcas incompletas ----------
@@ -754,30 +573,9 @@ public class ExcelService {
                 detalle.add(dtoIncompleto);
             }
 
-            // ---------- Configuración de horario activo ----------
-            LocalTime horaEntradaActiva = empleado.getHoraEntrada();
-            LocalTime horaSalidaActiva = empleado.getHoraSalida();
-            boolean esSegundoHorario = false;
-
-            if (empleado.getHoraEntrada2() != null && empleado.getHoraSalida2() != null && !marcasDelDia.isEmpty()) {
-                RegistroAsistencia primeraEntrada = marcasDelDia.get(0);
-                long diffHorario1 = Math.abs(Duration.between(primeraEntrada.getHora(), empleado.getHoraEntrada()).toMinutes());
-                long diffHorario2 = Math.abs(Duration.between(primeraEntrada.getHora(), empleado.getHoraEntrada2()).toMinutes());
-                if (diffHorario2 < diffHorario1) {
-                    horaEntradaActiva = empleado.getHoraEntrada2();
-                    horaSalidaActiva = empleado.getHoraSalida2();
-                    esSegundoHorario = true;
-                }
-            }
-
-            int flexMinutos = Optional.ofNullable(empleado.getFlexMinutos()).orElse(0);
-            LocalTime horaEntradaMaxima = horaEntradaActiva.plusMinutes(flexMinutos);
-            LocalTime horaEntradaMinima = horaEntradaActiva.minusMinutes(flexMinutos);
-            LocalTime horaSalidaMinima = horaSalidaActiva.minusMinutes(flexMinutos);
-            LocalTime horaSalidaMaxima = horaSalidaActiva.plusMinutes(flexMinutos);
-
             // ---------- Procesamiento de pares de marcas ----------
             for (int i = 0; i + 1 < marcasDelDia.size(); i += 2) {
+                numeroPar++;
                 RegistroAsistencia entrada = marcasDelDia.get(i);
                 RegistroAsistencia salida = marcasDelDia.get(i + 1);
 
@@ -786,6 +584,31 @@ public class ExcelService {
 
                 double horas = Duration.between(entrada.getHora(), salida.getHora()).toMinutes() / 60.0;
                 boolean esJustificada = entrada.getJustificacion() != null;
+
+                // ---------- DETERMINAR A QUÉ HORARIO PERTENECE ESTE PAR ----------
+                boolean esSegundoHorario = false;
+                LocalTime horaEntradaActiva = empleado.getHoraEntrada();
+                LocalTime horaSalidaActiva = empleado.getHoraSalida();
+
+                // Si el empleado tiene segundo horario configurado
+                if (empleado.getHoraEntrada2() != null && empleado.getHoraSalida2() != null) {
+                    // Calcular proximidad a ambos horarios
+                    long diffHorario1 = Math.abs(Duration.between(entrada.getHora(), empleado.getHoraEntrada()).toMinutes());
+                    long diffHorario2 = Math.abs(Duration.between(entrada.getHora(), empleado.getHoraEntrada2()).toMinutes());
+
+                    // Si está más cerca del segundo horario, usar ese
+                    if (diffHorario2 < diffHorario1) {
+                        horaEntradaActiva = empleado.getHoraEntrada2();
+                        horaSalidaActiva = empleado.getHoraSalida2();
+                        esSegundoHorario = true;
+                    }
+                }
+
+                int flexMinutos = Optional.ofNullable(empleado.getFlexMinutos()).orElse(0);
+                LocalTime horaEntradaMaxima = horaEntradaActiva.plusMinutes(flexMinutos);
+                LocalTime horaEntradaMinima = horaEntradaActiva.minusMinutes(flexMinutos);
+                LocalTime horaSalidaMinima = horaSalidaActiva.minusMinutes(flexMinutos);
+                LocalTime horaSalidaMaxima = horaSalidaActiva.plusMinutes(flexMinutos);
 
                 boolean llegoTarde = false;
                 int minutosTarde = 0;
@@ -800,73 +623,64 @@ public class ExcelService {
                     horasFinde = horas;
                     totalFinde += horasFinde;
                 } else {
-                    if (i == 0 && entrada.getHora().isAfter(horaEntradaMaxima)) {
+                    // Solo verificar llegada tarde para el primer par de cada horario
+                    if (numeroPar == 1 && entrada.getHora().isAfter(horaEntradaMaxima)) {
                         llegoTarde = true;
                         minutosTarde = (int) Duration.between(horaEntradaMaxima, entrada.getHora()).toMinutes();
                         totalLlegadasTarde++;
                         minutosTardeTotales += minutosTarde;
                     }
 
-                    // DETERMINAR SI ES PAR EXTRA (no es el primer par del día)
-                    boolean esParExtra = !esPrimeraMarca;
+                    // PARA TODOS LOS PARES (tanto primer horario como segundo horario): calcular horas normales y extras
+                    LocalTime inicio = entrada.getHora();
+                    LocalTime fin = salida.getHora();
 
-                    if (esParExtra) {
-                        // PARA PARES PURAMENTE EXTRA: todas las horas son extras
-                        tipoHora = "EXTRA";
-                        horasExtras = horas;
-                        totalExtras += horasExtras;
-                    } else {
-                        // PARA PRIMER PAR: calcular horas normales y extras por separado
-                        LocalTime inicio = entrada.getHora();
-                        LocalTime fin = salida.getHora();
+                    // Horas normales: tiempo dentro del horario laboral activo
+                    LocalTime inicioHorasNormales = inicio.isBefore(horaEntradaMinima) ? horaEntradaMinima : inicio;
+                    LocalTime finHorasNormales = fin.isAfter(horaSalidaMaxima) ? horaSalidaMaxima : fin;
 
-                        // Horas normales: tiempo dentro del horario laboral
-                        LocalTime inicioHorasNormales = inicio.isBefore(horaEntradaMinima) ? horaEntradaMinima : inicio;
-                        LocalTime finHorasNormales = fin.isAfter(horaSalidaMaxima) ? horaSalidaMaxima : fin;
-
-                        // Solo calcular horas normales si hay superposición con horario laboral
-                        if (inicioHorasNormales.isBefore(finHorasNormales) && !inicioHorasNormales.equals(finHorasNormales)) {
-                            horasNormales = Duration.between(inicioHorasNormales, finHorasNormales).toMinutes() / 60.0;
-                        }
-
-                        // Horas extras: tiempo fuera del horario laboral
-                        // Antes del horario laboral
-                        if (inicio.isBefore(horaEntradaMinima)) {
-                            LocalTime finExtra = inicioHorasNormales.isBefore(horaEntradaMinima) ? horaEntradaMinima : inicioHorasNormales;
-                            horasExtras += Duration.between(inicio, finExtra).toMinutes() / 60.0;
-                        }
-
-                        // Después del horario laboral
-                        if (fin.isAfter(horaSalidaMaxima)) {
-                            LocalTime inicioExtra = finHorasNormales.isAfter(horaSalidaMaxima) ? horaSalidaMaxima : finHorasNormales;
-                            horasExtras += Duration.between(inicioExtra, fin).toMinutes() / 60.0;
-                        }
-
-                        // Validación: asegurar que la suma coincida con el total
-                        double horasCalculadas = horasNormales + horasExtras;
-                        double diferencia = Math.abs(horasCalculadas - horas);
-
-                        if (diferencia > 0.01) { // Tolerancia por redondeo
-                            // Ajustar las horas extras para que coincida
-                            horasExtras = Math.max(0, horas - horasNormales);
-                        }
-
-                        // Determinar tipo de hora
-                        if (horasExtras > 0 && horasNormales > 0) {
-                            tipoHora = "MIXTO";
-                        } else if (horasExtras > 0) {
-                            tipoHora = "EXTRA";
-                        } else {
-                            tipoHora = "NORMAL";
-                        }
-
-                        totalNormales += horasNormales;
-                        totalExtras += horasExtras;
+                    // Solo calcular horas normales si hay superposición con horario laboral
+                    if (inicioHorasNormales.isBefore(finHorasNormales) && !inicioHorasNormales.equals(finHorasNormales)) {
+                        horasNormales = Duration.between(inicioHorasNormales, finHorasNormales).toMinutes() / 60.0;
                     }
+
+                    // Horas extras: tiempo fuera del horario laboral activo
+                    // Antes del horario laboral
+                    if (inicio.isBefore(horaEntradaMinima)) {
+                        LocalTime finExtra = inicioHorasNormales.isBefore(horaEntradaMinima) ? horaEntradaMinima : inicioHorasNormales;
+                        horasExtras += Duration.between(inicio, finExtra).toMinutes() / 60.0;
+                    }
+
+                    // Después del horario laboral
+                    if (fin.isAfter(horaSalidaMaxima)) {
+                        LocalTime inicioExtra = finHorasNormales.isAfter(horaSalidaMaxima) ? horaSalidaMaxima : finHorasNormales;
+                        horasExtras += Duration.between(inicioExtra, fin).toMinutes() / 60.0;
+                    }
+
+                    // Validación: asegurar que la suma coincida con el total
+                    double horasCalculadas = horasNormales + horasExtras;
+                    double diferencia = Math.abs(horasCalculadas - horas);
+
+                    if (diferencia > 0.01) { // Tolerancia por redondeo
+                        // Ajustar las horas extras para que coincida
+                        horasExtras = Math.max(0, horas - horasNormales);
+                    }
+
+                    // Determinar tipo de hora
+                    if (horasExtras > 0 && horasNormales > 0) {
+                        tipoHora = "MIXTO";
+                    } else if (horasExtras > 0) {
+                        tipoHora = "EXTRA";
+                    } else {
+                        tipoHora = "NORMAL";
+                    }
+
+                    // SUMAR A LOS TOTALES CORRECTOS
+                    // Ambos horarios (primero y segundo) suman como horas normales
+                    totalNormales += horasNormales;
+                    totalExtras += horasExtras;
                 }
 
-                // CORRECCIÓN: Solo sumar horas normales al total general
-                // Las horas extras ya se contabilizan por separado
                 totalHoras += horas;
 
                 if (esJustificada) {
@@ -883,7 +697,7 @@ public class ExcelService {
                 dto.setHoraEntrada(entrada.getHora());
                 dto.setHoraSalida(salida.getHora());
                 dto.setTipoHora(tipoHora);
-                dto.setHorasTrabajadas(horas); // ← USAR EL TOTAL REAL DE HORAS, NO LA SUMA
+                dto.setHorasTrabajadas(horas);
                 dto.setMarcaIncompleta(false);
                 dto.setAusente(false);
                 dto.setLlegoTarde(llegoTarde);
@@ -893,7 +707,7 @@ public class ExcelService {
                 dto.setJustificada(esJustificada);
                 dto.setSegundoHorario(esSegundoHorario);
                 dto.setHorasExtras(horasExtras);
-                dto.setHorasNormales(horasNormales); // ← AGREGAR ESTE CAMPO SI NO EXISTE
+                dto.setHorasNormales(horasNormales);
                 dto.setFotoEntradaBase64(fotoEntradaBase64);
                 dto.setFotoSalidaBase64(fotoSalidaBase64);
 
@@ -904,7 +718,6 @@ public class ExcelService {
                 }
 
                 detalle.add(dto);
-                esPrimeraMarca = false;
             }
 
             // ---------- Día sin marcas ----------
@@ -922,15 +735,16 @@ public class ExcelService {
                     if (tieneAusenciaJustificada) {
                         // Día con ausencia justificada (vacaciones, licencia, etc.) - considerar como horario normal
                         dto.setTipoHora("NORMAL");
-                        dto.setAusente(false); // No es ausente porque está justificado
+                        dto.setAusente(false);
                         dto.setJustificada(true);
-                        dto.setTipoDeAusencia(ausenciaDia.getTipoDeAusencia()); // ← MOSTRAR EL TIPO DE AUSENCIA
+                        dto.setTipoDeAusencia(ausenciaDia.getTipoDeAusencia());
 
-                        // Calcular horas normales como si hubiera trabajado el horario completo
-                        double horasTrabajadasNormales = Duration.between(horaEntradaActiva, horaSalidaActiva).toMinutes() / 60.0;
+                        // Calcular horas normales como si hubiera trabajado el horario completo del primer turno
+                        double horasTrabajadasNormales = Duration.between(empleado.getHoraEntrada(), empleado.getHoraSalida()).toMinutes() / 60.0;
                         dto.setHorasTrabajadas(horasTrabajadasNormales);
                         totalNormales += horasTrabajadasNormales;
                         totalHoras += horasTrabajadasNormales;
+
                         // CONTABILIZAR TIPOS DE AUSENCIA JUSTIFICADA
                         if (ausenciaDia.getTipoDeAusencia() == Ausencia.TipoDeAusencia.FALTA_CON_AVISO) {
                             totalFaltasConAviso++;
@@ -939,8 +753,6 @@ public class ExcelService {
                         } else if (ausenciaDia.getTipoDeAusencia() == Ausencia.TipoDeAusencia.JUSTIFICADA) {
                             totalAusenciasJustificadas++;
                         }
-
-
                     } else {
                         // Día sin marcas y sin ausencia justificada - es ausencia real
                         dto.setTipoHora("AUSENTE");
@@ -956,9 +768,8 @@ public class ExcelService {
                     dto.setTipoDeAusencia(null);
                 }
 
-                // SIEMPRE establecer el tipo de ausencia si existe, incluso para días justificados
                 if (ausenciaDia != null) {
-                    dto.setTipoDeAusencia(ausenciaDia.getTipoDeAusencia()); // ← ESTA LÍNEA ES CLAVE
+                    dto.setTipoDeAusencia(ausenciaDia.getTipoDeAusencia());
                 }
 
                 detalle.add(dto);
@@ -971,44 +782,38 @@ public class ExcelService {
                 diasTrabajados++;
             }
 
-
             actual = actual.plusDays(1);
         }
 
         // ---------- Cálculo de presentismo ----------
         boolean tieneAusenciaQueQuitaPresentismo = detalle.stream().anyMatch(dto -> {
             Ausencia.TipoDeAusencia tipo = dto.getTipoDeAusencia();
-            // Si existe una ausencia y no es vacaciones ni no_marco, quita presentismo
             return tipo != null
                     && tipo != Ausencia.TipoDeAusencia.VACACIONES
                     && tipo != Ausencia.TipoDeAusencia.NO_MARCO;
         });
 
         int totalMinutosTarde = detalle.stream().mapToInt(ResumenEmpleadoDTO::getMinutosTarde).sum();
-
-// Presentismo: solo si NO tiene ausencias (excepto vacaciones o no_marco) y no supera los 30 minutos tarde
         boolean presentismo = !(tieneAusenciaQueQuitaPresentismo || totalMinutosTarde > 30);
 
         detalle.forEach(dto -> dto.setPresentismo(presentismo));
 
-
         return detalle;
     }
-
 
     public Map<String, Object> generarDetalleEmpleadoView(String dni, LocalDate desde, LocalDate hasta) {
         Empleado empleado = empleadoRepo.findByDni(dni).orElseThrow();
         List<RegistroAsistencia> registros = registroRepository.findByEmpleadoDniAndFechaBetween(dni, desde, hasta);
 
-        // DECIDIR QUÉ MÉTODO USAR SEGÚN EL ÁREA
+        // DECIDIR QUÉ MÉTODO USAR SEGÚN EL ÁREA Y LA VARIABLE BOOLEANA
         List<ResumenEmpleadoDTO> detalle;
         boolean esAreaHogarAdultosMayores = empleado.getArea() != null &&
                 "Hogar de Adultos Mayores".equals(empleado.getArea().getNombre());
 
-        if (esAreaHogarAdultosMayores) {
-            detalle = procesarAsistenciasTurnosNocturnos(empleado, registros, desde, hasta);
+        boolean usaLogicaEspecial = esAreaHogarAdultosMayores || empleado.isNoCumpleHorarioNormal();
 
-
+        if (usaLogicaEspecial) {
+            detalle = procesarAsistenciasTurnosAnormales(empleado, registros, desde, hasta);
         } else {
             detalle = procesarAsistenciasEmpleado(empleado, registros, desde, hasta);
         }
