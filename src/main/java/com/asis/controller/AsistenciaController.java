@@ -5,6 +5,7 @@ import com.asis.model.Empleado;
 import com.asis.model.LogCargaAsistencia;
 import com.asis.model.dto.CargaAsistenciaDTO;
 import com.asis.model.dto.EdicionHorarioDTO;
+import com.asis.model.dto.RegistroDTO;
 import com.asis.model.dto.ResumenAsistenciasDTO;
 import com.asis.repository.EmpleadoRepository;
 import com.asis.repository.LogCargaAsistenciaRepository;
@@ -17,6 +18,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
@@ -25,6 +27,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Controller
 @RequiredArgsConstructor
@@ -179,6 +183,8 @@ public class AsistenciaController {
     @GetMapping("/detalle")
     public String detalleAsistencia(
             @RequestParam(name = "dni", required = false) String dni,
+            @RequestParam(name = "empleadoId", required = false) Long empleadoId, // Nuevo parámetro
+            @RequestParam(name = "empleado", required = false) String empleadoNombre, // Nuevo parámetro
             @RequestParam(name = "desde", required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
             @RequestParam(name = "hasta", required = false)
@@ -186,6 +192,28 @@ public class AsistenciaController {
             Model model) {
 
         model.addAttribute("empleados", empleadoRepo.findAll());
+
+        // Buscar empleado por ID si está presente (preferencia por ID)
+        Empleado empleadoSeleccionado = null;
+        if (empleadoId != null) {
+            empleadoSeleccionado = empleadoRepo.findById(empleadoId).orElse(null);
+        } else if (dni != null) {
+            // Fallback a DNI si no hay ID
+            empleadoSeleccionado = empleadoRepo.findByDni(dni).orElse(null);
+        }
+
+        if (empleadoSeleccionado != null) {
+            // Usar datos del empleado encontrado
+            dni = empleadoSeleccionado.getDni();
+            model.addAttribute("empleadoNombreCompleto",
+                    empleadoSeleccionado.getApellido() + ", " + empleadoSeleccionado.getNombre());
+            model.addAttribute("empleadoId", empleadoSeleccionado.getId());
+        } else if (empleadoNombre != null && !empleadoNombre.isEmpty()) {
+            // Mantener el nombre ingresado si no se encontró empleado
+            model.addAttribute("empleadoNombreCompleto", empleadoNombre);
+        } else {
+            model.addAttribute("empleadoNombreCompleto", "");
+        }
 
         if (dni != null && desde != null && hasta != null) {
             Map<String, Object> detalleModel = excelService.generarDetalleEmpleadoView(dni, desde, hasta);
@@ -246,45 +274,17 @@ public class AsistenciaController {
             model.addAttribute("hasta", hasta);
         }
 
+        // Asegurar que los atributos estén presentes
+        model.addAttribute("dni", dni);
+        if (!model.containsAttribute("empleadoId")) {
+            model.addAttribute("empleadoId", empleadoId);
+        }
+
         return "asistencias/detalle-asistencias";
     }
 
 
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'SUPERVISOR')")
-    private void asegurarAtributosModelo(Model model, Map<String, Object> detalleModel) {
-        // Lista de atributos que deben estar siempre presentes
-        String[] atributosRequeridos = {
-                "detalle", "empleado", "totalHoras", "totalNormales",
-                "totalExtras", "totalFindeFeriado", "totalAusencias",
-                "totalLlegadasTarde", "diasTrabajados", "minutosTardeTotales"
-        };
 
-        // Asegurar que cada atributo requerido tenga un valor por defecto si no está presente
-        for (String atributo : atributosRequeridos) {
-            if (!detalleModel.containsKey(atributo)) {
-                switch (atributo) {
-                    case "detalle":
-                        model.addAttribute("detalle", Collections.emptyList());
-                        break;
-                    case "empleado":
-                        // No podemos crear un empleado por defecto, pero al menos evitamos null
-                        break;
-                    case "totalHoras":
-                    case "totalNormales":
-                    case "totalExtras":
-                    case "totalFindeFeriado":
-                        model.addAttribute(atributo, 0.0);
-                        break;
-                    case "totalAusencias":
-                    case "totalLlegadasTarde":
-                    case "diasTrabajados":
-                    case "minutosTardeTotales":
-                        model.addAttribute(atributo, 0);
-                        break;
-                }
-            }
-        }
-    }
 
     @PreAuthorize("hasAnyRole('ADMINISTRADOR')")
     @GetMapping("/editar-horario")
@@ -293,37 +293,105 @@ public class AsistenciaController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha,
             Model model) {
 
-        // Obtenemos el DTO con los horarios basados en registros existentes
+        // Obtenemos el DTO con los registros existentes
         EdicionHorarioDTO dto = excelService.prepararEdicionHorario(dni, fecha);
 
         // Verificamos si hay registros existentes
-        boolean tieneRegistros = !dto.getEntradas().isEmpty() || !dto.getSalidas().isEmpty();
+        boolean tieneRegistros = !dto.getRegistros().isEmpty();
 
         // Agregamos atributos al modelo
         model.addAttribute("edicionDTO", dto);
         model.addAttribute("tieneRegistros", tieneRegistros);
 
+        // También puedes agregar información del empleado para mostrar en la vista
+        Optional<Empleado> empleadoOpt = empleadoRepo.findByDni(dni);
+        if (empleadoOpt.isPresent()) {
+            model.addAttribute("empleado", empleadoOpt.get());
+            model.addAttribute("fechaFormateada", fecha.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+        }
+
         return "asistencias/editar-horario";
     }
-
 
     @PreAuthorize("hasAnyRole('ADMINISTRADOR')")
     @PostMapping("/guardar-horario")
     public String guardarHorarioEditado(
             @ModelAttribute EdicionHorarioDTO edicionDTO,
+            BindingResult bindingResult,
             RedirectAttributes redirectAttributes) {
 
-        try {
-            excelService.editarHorariosDia(edicionDTO);
-            redirectAttributes.addFlashAttribute("success", "Horarios actualizados correctamente");
-        } catch (Exception e) {
-            redirectAttributes.addFlashAttribute("error", "Error al actualizar horarios: " + e.getMessage());
+        if (bindingResult.hasErrors()) {
+            redirectAttributes.addFlashAttribute("error", "Error en los datos del formulario");
+            return "redirect:/asistencias/editar-horario?dni=" + edicionDTO.getDni() +
+                    "&fecha=" + edicionDTO.getFecha().format(DateTimeFormatter.ISO_DATE);
         }
 
-        // Redirigir nuevamente al formulario de edición
+        try {
+            // Validar que haya al menos un registro
+            if (edicionDTO.getRegistros() == null || edicionDTO.getRegistros().isEmpty()) {
+                redirectAttributes.addFlashAttribute("warning", "Debe agregar al menos un registro");
+                return "redirect:/asistencias/editar-horario?dni=" + edicionDTO.getDni() +
+                        "&fecha=" + edicionDTO.getFecha().format(DateTimeFormatter.ISO_DATE);
+            }
+
+            // Filtrar registros con hora nula (eliminados por el usuario)
+            List<RegistroDTO> registrosValidos = edicionDTO.getRegistros().stream()
+                    .filter(registro -> registro.getHora() != null)
+                    .collect(Collectors.toList());
+
+            if (registrosValidos.isEmpty()) {
+                redirectAttributes.addFlashAttribute("warning", "Debe agregar al menos un registro con hora válida");
+                return "redirect:/asistencias/editar-horario?dni=" + edicionDTO.getDni() +
+                        "&fecha=" + edicionDTO.getFecha().format(DateTimeFormatter.ISO_DATE);
+            }
+
+            edicionDTO.setRegistros(registrosValidos);
+
+            // Guardar los registros
+            excelService.editarRegistrosAsistencia(edicionDTO);
+
+            redirectAttributes.addFlashAttribute("success", "Registros actualizados correctamente");
+
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("error", "Error al actualizar registros: " + e.getMessage());
+            e.printStackTrace(); // Para debugging
+        }
+
         return "redirect:/asistencias/editar-horario?dni=" + edicionDTO.getDni() +
                 "&fecha=" + edicionDTO.getFecha().format(DateTimeFormatter.ISO_DATE);
     }
+
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR')")
+    @PostMapping("/eliminar-todos-registros")
+    public String eliminarTodosRegistrosDelDia(
+            @RequestParam String dni,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha,
+            @RequestParam(required = false) String motivo,
+            RedirectAttributes redirectAttributes) {
+
+        try {
+            // VERIFICAR PRIMERO SI EL EMPLEADO EXISTE
+            Optional<Empleado> empleadoOpt = empleadoRepo.findByDni(dni);
+            if (!empleadoOpt.isPresent()) {
+                redirectAttributes.addFlashAttribute("error", "Empleado con DNI " + dni + " no encontrado");
+                return "redirect:/asistencias/editar-horario?dni=" + dni + "&fecha=" + fecha;
+            }
+
+            // Eliminar todos los registros del día
+            registroRepo.deleteAllByEmpleadoDniAndFecha(dni, fecha);
+
+            // Registrar la acción en un log (opcional)
+
+            redirectAttributes.addFlashAttribute("success", "Todos los registros han sido eliminados correctamente");
+
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("error", "Error al eliminar registros: " + e.getMessage());
+            e.printStackTrace();
+        }
+
+        return "redirect:/asistencias/editar-horario?dni=" + dni + "&fecha=" + fecha;
+    }
+
 
 }
 

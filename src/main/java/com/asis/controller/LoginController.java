@@ -7,9 +7,11 @@ import com.asis.model.Usuario;
 import com.asis.repository.EmpleadoRepository;
 import com.asis.repository.RegistroRepository;
 import com.asis.repository.UsuarioRepository;
+import com.asis.service.UsuarioService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -23,8 +25,11 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.io.IOException;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.temporal.ChronoUnit;
 import java.util.Base64;
+import java.util.List;
 
 @Controller
 public class LoginController {
@@ -36,7 +41,7 @@ public class LoginController {
     private EmpleadoRepository empleadoRepo;
 
     @Autowired
-    private RegistroRepository registroRepo;
+    private UsuarioService usuarioService;
 
     @GetMapping("/login")
     public String mostrarLogin() {
@@ -82,28 +87,11 @@ public class LoginController {
         String base64Image = fotoBase64.split(",")[1];
         byte[] imageBytes = Base64.getDecoder().decode(base64Image);
 
-        registrarMarcaConFoto(empleado, imageBytes);
+        // 👉 delegar al service (transacción + lock + cooldown)
+        usuarioService.registrarMarcaConFoto(empleado, imageBytes);
 
         new SecurityContextLogoutHandler().logout(request, response, authentication);
         return "redirect:/login?marca=ok";
     }
 
-    private void registrarMarcaConFoto(Empleado empleado, byte[] foto) {
-        LocalDate hoy = LocalDate.now();
-        Integer ultimoOrden = registroRepo.findMaxOrdenDiaByEmpleadoAndFecha(empleado.getId(), hoy);
-        int nuevoOrden = (ultimoOrden == null) ? 1 : ultimoOrden + 1;
-
-        // Restar 3 horas al tiempo actual
-        LocalTime horaActualMenos3 = LocalTime.now().minusHours(3);
-
-        RegistroAsistencia registro = new RegistroAsistencia();
-        registro.setFecha(hoy);
-        registro.setHora(horaActualMenos3); // Usar la hora ajustada
-        registro.setOrdenDia(nuevoOrden);
-        registro.setEmpleado(empleado);
-        registro.setTipo(nuevoOrden % 2 == 1 ? "ENTRADA" : "SALIDA");
-        registro.setFoto(foto);
-
-        registroRepo.save(registro);
-    }
 }

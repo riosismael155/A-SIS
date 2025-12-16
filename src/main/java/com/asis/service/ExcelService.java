@@ -1,10 +1,7 @@
 package com.asis.service;
 
 import com.asis.model.*;
-import com.asis.model.dto.CargaAsistenciaDTO;
-import com.asis.model.dto.EdicionHorarioDTO;
-import com.asis.model.dto.ResumenAsistenciasDTO;
-import com.asis.model.dto.ResumenEmpleadoDTO;
+import com.asis.model.dto.*;
 import com.asis.repository.EmpleadoRepository;
 import com.asis.repository.LogCargaAsistenciaRepository;
 import com.asis.repository.RegistroRepository;
@@ -19,6 +16,7 @@ import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.time.format.TextStyle;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -1023,48 +1021,111 @@ public class ExcelService {
     }
 
 
+//    @Transactional
+//    public void editarHorariosDia(EdicionHorarioDTO dto) {
+//        Empleado empleado = empleadoRepo.findByDni(dto.getDni())
+//                .orElseThrow(() -> new RuntimeException("Empleado no encontrado"));
+//
+//        // Eliminar registros existentes
+//        List<RegistroAsistencia> registros = registroRepository
+//                .findByEmpleadoDniAndFecha(dto.getDni(), dto.getFecha());
+//        registroRepository.deleteAll(registros);
+//
+//        // Validar y guardar dinámicamente
+//        int totalHorarios = Math.min(dto.getEntradas().size(), dto.getSalidas().size());
+//
+//        for (int i = 0; i < totalHorarios; i++) {
+//            LocalTime entrada = dto.getEntradas().get(i);
+//            LocalTime salida = dto.getSalidas().get(i);
+//
+//            if (entrada != null && salida != null && entrada.isAfter(salida)) {
+//                throw new IllegalArgumentException("La entrada " + (i + 1) + " no puede ser posterior a la salida");
+//            }
+//
+//            RegistroAsistencia regEntrada = new RegistroAsistencia();
+//            regEntrada.setEmpleado(empleado);
+//            regEntrada.setFecha(dto.getFecha());
+//            regEntrada.setHora(entrada);
+//            regEntrada.setOrdenDia(i * 2 + 1);
+//            regEntrada.setTipoHora(detectarTipoHora(empleado, dto.getFecha(), i * 2));
+//            regEntrada.setMotivoCambio(dto.getMotivoCambio());
+//
+//            RegistroAsistencia regSalida = new RegistroAsistencia();
+//            regSalida.setEmpleado(empleado);
+//            regSalida.setFecha(dto.getFecha());
+//            regSalida.setHora(salida);
+//            regSalida.setOrdenDia(i * 2 + 2);
+//            regSalida.setTipoHora(detectarTipoHora(empleado, dto.getFecha(), i * 2 + 1));
+//            regSalida.setMotivoCambio(dto.getMotivoCambio());
+//
+//            registroRepository.save(regEntrada);
+//            registroRepository.save(regSalida);
+//        }
+//    }
+
     @Transactional
-    public void editarHorariosDia(EdicionHorarioDTO dto) {
+    public void editarRegistrosAsistencia(EdicionHorarioDTO dto) {
         Empleado empleado = empleadoRepo.findByDni(dto.getDni())
                 .orElseThrow(() -> new RuntimeException("Empleado no encontrado"));
 
-        // Eliminar registros existentes
-        List<RegistroAsistencia> registros = registroRepository
+        // Obtener registros existentes ordenados cronológicamente
+        List<RegistroAsistencia> registrosExistentes = registroRepository
                 .findByEmpleadoDniAndFecha(dto.getDni(), dto.getFecha());
-        registroRepository.deleteAll(registros);
 
-        // Validar y guardar dinámicamente
-        int totalHorarios = Math.min(dto.getEntradas().size(), dto.getSalidas().size());
+        // ORDENAR LOS REGISTROS EXISTENTES CRONOLÓGICAMENTE
+        registrosExistentes.sort(Comparator.comparing(RegistroAsistencia::getHora));
 
-        for (int i = 0; i < totalHorarios; i++) {
-            LocalTime entrada = dto.getEntradas().get(i);
-            LocalTime salida = dto.getSalidas().get(i);
+        // Crear mapa de registros existentes por ID para fácil acceso
+        Map<Long, RegistroAsistencia> mapaExistentes = registrosExistentes.stream()
+                .collect(Collectors.toMap(RegistroAsistencia::getId, Function.identity()));
 
-            if (entrada != null && salida != null && entrada.isAfter(salida)) {
-                throw new IllegalArgumentException("La entrada " + (i + 1) + " no puede ser posterior a la salida");
+        // Lista para nuevos registros
+        List<RegistroAsistencia> nuevosRegistros = new ArrayList<>();
+
+        // ORDENAR LOS REGISTROS DEL DTO CRONOLÓGICAMENTE
+        List<RegistroDTO> registrosOrdenados = dto.getRegistros().stream()
+                .filter(registro -> registro.getHora() != null)
+                .sorted(Comparator.comparing(RegistroDTO::getHora))
+                .collect(Collectors.toList());
+
+        // Procesar cada registro del DTO (ahora ordenados)
+        for (int i = 0; i < registrosOrdenados.size(); i++) {
+            RegistroDTO registroDTO = registrosOrdenados.get(i);
+
+            if (registroDTO.getId() != null && mapaExistentes.containsKey(registroDTO.getId())) {
+                // Actualizar registro existente
+                RegistroAsistencia registro = mapaExistentes.get(registroDTO.getId());
+                registro.setHora(registroDTO.getHora());
+                registro.setTipo(registroDTO.getTipo());
+                registro.setOrdenDia(i);
+                registro.setMotivoCambio(dto.getMotivoCambio());
+
+                // Marcar como procesado
+                mapaExistentes.remove(registroDTO.getId());
+            } else {
+                // Crear nuevo registro
+                RegistroAsistencia nuevoRegistro = new RegistroAsistencia();
+                nuevoRegistro.setEmpleado(empleado);
+                nuevoRegistro.setFecha(dto.getFecha());
+                nuevoRegistro.setHora(registroDTO.getHora());
+                nuevoRegistro.setTipo(registroDTO.getTipo());
+                nuevoRegistro.setOrdenDia(i);
+                nuevoRegistro.setMotivoCambio(dto.getMotivoCambio());
+
+                nuevosRegistros.add(nuevoRegistro);
             }
+        }
 
-            RegistroAsistencia regEntrada = new RegistroAsistencia();
-            regEntrada.setEmpleado(empleado);
-            regEntrada.setFecha(dto.getFecha());
-            regEntrada.setHora(entrada);
-            regEntrada.setOrdenDia(i * 2 + 1);
-            regEntrada.setTipoHora(detectarTipoHora(empleado, dto.getFecha(), i * 2));
-            regEntrada.setMotivoCambio(dto.getMotivoCambio());
+        // Eliminar registros que no están en el DTO (fueron removidos por el usuario)
+        if (!mapaExistentes.isEmpty()) {
+            registroRepository.deleteAll(mapaExistentes.values());
+        }
 
-            RegistroAsistencia regSalida = new RegistroAsistencia();
-            regSalida.setEmpleado(empleado);
-            regSalida.setFecha(dto.getFecha());
-            regSalida.setHora(salida);
-            regSalida.setOrdenDia(i * 2 + 2);
-            regSalida.setTipoHora(detectarTipoHora(empleado, dto.getFecha(), i * 2 + 1));
-            regSalida.setMotivoCambio(dto.getMotivoCambio());
-
-            registroRepository.save(regEntrada);
-            registroRepository.save(regSalida);
+        // Guardar nuevos registros
+        if (!nuevosRegistros.isEmpty()) {
+            registroRepository.saveAll(nuevosRegistros);
         }
     }
-
 
     public EdicionHorarioDTO prepararEdicionHorario(String dni, LocalDate fecha) {
         EdicionHorarioDTO dto = new EdicionHorarioDTO();
@@ -1074,17 +1135,20 @@ public class ExcelService {
         List<RegistroAsistencia> registros = registroRepository
                 .findByEmpleadoDniAndFecha(dni, fecha)
                 .stream()
-                .sorted(Comparator.comparing(RegistroAsistencia::getOrdenDia))
+                // ORDENAR CRONOLÓGICAMENTE POR HORA (más antiguo a más nuevo)
+                .sorted(Comparator.comparing(RegistroAsistencia::getHora))
                 .collect(Collectors.toList());
 
-        for (int i = 0; i < registros.size(); i++) {
-            if (i % 2 == 0) {
-                dto.getEntradas().add(registros.get(i).getHora());
-            } else {
-                dto.getSalidas().add(registros.get(i).getHora());
-            }
-        }
+        // Convertir registros a DTOs
+        List<RegistroDTO> registroDTOs = registros.stream()
+                .map(registro -> new RegistroDTO(
+                        registro.getId(),
+                        registro.getHora(),
+                        registro.getTipo()
+                ))
+                .collect(Collectors.toList());
 
+        dto.setRegistros(registroDTOs);
         return dto;
     }
 

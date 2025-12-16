@@ -2,7 +2,9 @@ package com.asis.repository;
 
 import com.asis.model.Empleado;
 import com.asis.model.RegistroAsistencia;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -37,5 +39,26 @@ public interface RegistroRepository extends JpaRepository<RegistroAsistencia, Lo
 
     List<RegistroAsistencia> findByFechaBetween(LocalDate desde, LocalDate hasta);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            SELECT r
+            FROM RegistroAsistencia r
+            WHERE r.empleado.id = :empleadoId
+            ORDER BY r.fecha DESC, r.hora DESC
+            """)
+    List<RegistroAsistencia> findUltimaMarcaConLock(@Param("empleadoId") Long empleadoId);
+
+
+
+    // OPCIÓN B: Método alternativo si la opción A no funciona
+    @Transactional
+    default void deleteAllByEmpleadoDniAndFecha(String dni, LocalDate fecha) {
+        List<RegistroAsistencia> registros = findByEmpleadoDniAndFecha(dni, fecha);
+        deleteAll(registros);
+    }
+
 }
+
+
+
 

@@ -20,18 +20,27 @@
                 <h4 class="mb-0 text-h">Detalle Individual de Asistencia</h4>
             </div>
 
-            <!-- Formulario -->
             <form method="get" th:action="@{/asistencias/detalle}"
                   class="form-inline-strict d-flex flex-wrap gap-3 align-items-end justify-content-between mb-4">
 
                 <!-- BLOQUE 1: Autocompletado -->
                 <div class="form-group d-flex flex-column position-relative flex-grow-1" style="min-width: 250px;">
                     <label for="empleado" class="form-label">Empleado</label>
-                    <input type="text" id="empleado" name="empleado" class="form-control"
-                           placeholder="Buscar por apellido, nombre o DNI" autocomplete="off">
-                    <input type="hidden" id="dni" name="dni">
+                    <div class="input-group">
+                        <input type="text" id="empleado" name="empleado" class="form-control"
+                               placeholder="Buscar por apellido, nombre o DNI"
+                               autocomplete="off"
+                               th:value="${empleadoNombreCompleto}">
+                        <!-- Botón para limpiar -->
+                        <button type="button" id="limpiarEmpleado" class="btn btn-outline-secondary"
+                                title="Limpiar selección">
+                            <i class="bi bi-x"></i>
+                        </button>
+                    </div>
+                    <input type="hidden" id="dni" name="dni" th:value="${dni}">
+                    <input type="hidden" id="empleadoId" name="empleadoId" th:value="${empleadoId}">
                     <div id="sugerencias" class="list-group position-absolute w-100 z-3"
-                         style="top: 100%; max-height: 200px; overflow-y: auto;"></div>
+                         style="top: 100%; max-height: 200px; overflow-y: auto; display: none; z-index: 1000;"></div>
                 </div>
 
                 <!-- BLOQUE 2: Desde y Hasta -->
@@ -50,7 +59,6 @@
                     </button>
                 </div>
             </form>
-
             <!-- Contenido si hay datos -->
             <div th:if="${detalle != null}">
                 <h5 class="mb-3 text-h"
@@ -302,6 +310,45 @@
     });
 </script>
 
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const empleadoInput = document.getElementById('empleado');
+        const dniInput = document.getElementById('dni');
+        const empleadoIdInput = document.getElementById('empleadoId');
+        const limpiarBtn = document.getElementById('limpiarEmpleado');
+
+        if (limpiarBtn) {
+            limpiarBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+
+                // Limpiar campos
+                empleadoInput.value = '';
+                dniInput.value = '';
+                empleadoIdInput.value = '';
+
+                // Limpiar parámetros de la URL
+                const url = new URL(window.location);
+                url.searchParams.delete('empleadoId');
+                url.searchParams.delete('dni');
+                url.searchParams.delete('empleado');
+
+                // Actualizar URL sin recargar
+                window.history.replaceState({}, '', url);
+
+                // Enfocar el campo de búsqueda
+                empleadoInput.focus();
+            });
+        }
+
+        // Limpiar automáticamente cuando el usuario borra el campo
+        empleadoInput.addEventListener('input', function() {
+            if (this.value.trim() === '') {
+                dniInput.value = '';
+                empleadoIdInput.value = '';
+            }
+        });
+    });
+</script>
 <div th:replace="fragments/footer :: footer"></div>
 
 </body>

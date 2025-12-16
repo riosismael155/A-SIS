@@ -21,15 +21,10 @@
                 <h4 class="mb-0 text-h">Editar Horarios</h4>
             </div>
 
-            <!-- Información del empleado y fecha -->
-            <div class="mb-4">
-                <p class="mb-1"><strong>Empleado:</strong> <span th:text="${edicionDTO.dni}"></span></p>
-                <p class="mb-1"><strong>Fecha:</strong> <span th:text="${#temporals.format(edicionDTO.fecha, 'dd/MM/yyyy')}"></span></p>
-            </div>
-
 
             <!-- Mensaje para justificar ausencia -->
-            <div th:if="${!tieneRegistros}" class="alert alert-warning d-flex align-items-center justify-content-between p-3 border border-warning rounded">
+            <div th:if="${!tieneRegistros}"
+                 class="alert alert-warning d-flex align-items-center justify-content-between p-3 border border-warning rounded">
                 <div>
                     <i class="bi bi-exclamation-triangle-fill me-2"></i>
                     No se registró asistencia para esta fecha.
@@ -40,57 +35,93 @@
             </div>
 
 
+            <form th:action="@{/asistencias/guardar-horario}"
+                  th:object="${edicionDTO}"
+                  method="post"
+                  class="mt-3">
 
-            <!-- Formulario de edición -->
-            <form th:action="@{/asistencias/guardar-horario}" th:object="${edicionDTO}" method="post" class="mt-3">
                 <input type="hidden" th:field="*{dni}" />
                 <input type="hidden" th:field="*{fecha}" />
 
-                <div id="horariosContainer">
-                    <div th:if="${#lists.size(edicionDTO.entradas) > 0 or #lists.size(edicionDTO.salidas) > 0}"
-                         th:each="i : ${#numbers.sequence(0, T(java.lang.Math).max(#lists.size(edicionDTO.entradas), #lists.size(edicionDTO.salidas)) - 1)}"
-                         class="card mb-4 horario-item">
-                        <div class="card-header bg-light">
-                            <h5 class="mb-0" th:text="${i == 0 ? 'Horario Principal' : 'Horario Secundario'}"></h5>
-                        </div>
-                        <div class="card-body">
-                            <div class="row mb-3">
-                                <div class="col-md-6">
-                                    <label class="form-label">Hora de Entrada</label>
-                                    <input type="time" class="form-control"
-                                           th:value="${i < #lists.size(edicionDTO.entradas) ? edicionDTO.entradas[i] : ''}"
-                                           th:name="entradas[__${i}__]" />
+                <div class="d-flex align-items-center gap-2 mb-3">
+                    <strong>Fecha:</strong>
+                    <span th:text="${#temporals.format(edicionDTO.fecha, 'dd/MM/yyyy')}"></span>
+                    <span th:text="${#temporals.format(edicionDTO.fecha, 'EEEE')}"></span>
+                </div>
+
+                <div id="registrosContainer" class="row">
+                    <div th:each="registro, stat : ${edicionDTO.registros}"
+                         class="col-md-6 mb-3">
+                        <div class="card registro-item">
+
+                            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                                <h6 class="mb-0" th:text="${'Registro ' + (stat.index + 1)}"></h6>
+                                <button type="button" class="btn btn-sm btn-outline-danger eliminarRegistroBtn"
+                                        title="Eliminar registro">
+                                    <i class="bi bi-trash"></i> Eliminar
+                                </button>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Tipo</label>
+                                        <select class="form-control registro-tipo"
+                                                th:name="registros[__${stat.index}__].tipo">
+                                            <option value="ENTRADA" th:selected="${registro.tipo == 'ENTRADA'}">
+                                                Entrada
+                                            </option>
+                                            <option value="SALIDA" th:selected="${registro.tipo == 'SALIDA'}">Salida
+                                            </option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Hora</label>
+                                        <input type="time" class="form-control registro-hora"
+                                               th:value="${registro.hora != null ? #temporals.format(registro.hora, 'HH:mm') : ''}"
+                                               th:name="registros[__${stat.index}__].hora"/>
+                                    </div>
                                 </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">Hora de Salida</label>
-                                    <input type="time" class="form-control"
-                                           th:value="${i < #lists.size(edicionDTO.salidas) ? edicionDTO.salidas[i] : ''}"
-                                           th:name="salidas[__${i}__]" />
-                                </div>
+                                <input type="hidden" th:field="*{registros[__${stat.index}__].id}"/>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- Botón para agregar otro par de horario (solo si existen registros previos) -->
-                <div class="mb-4" th:if="${tieneRegistros}">
-                    <button type="button" class="btn btn-outline-secondary" id="agregarHorarioBtn">
-                        <i class="bi bi-plus-circle me-1"></i> Agregar otro horario
-                    </button>
-                </div>
+                    <!-- Botones para agregar y eliminar registros -->
+                    <div th:if="${tieneRegistros}">
+                        <div class="mb-4 d-flex justify-content-between">
+                            <button type="button" class="btn btn-outline-primary" id="agregarRegistroBtn">
+                                <i class="bi bi-plus-circle me-1"></i> Agregar Registro
+                            </button>
+                        </div>
 
-                <!-- Motivo del cambio -->
-                <div class="mb-4" th:if="${tieneRegistros}">
-                    <label for="motivoCambio" class="form-label">Motivo del cambio</label>
-                    <textarea class="form-control" id="motivoCambio" th:field="*{motivoCambio}" rows="3" required></textarea>
-                </div>
+                        <!-- Motivo del cambio -->
+                        <div class="mb-4">
+                            <label for="motivoCambio" class="form-label">Motivo del cambio</label>
+                            <textarea class="form-control" id="motivoCambio" th:field="*{motivoCambio}"
+                                      rows="3" required></textarea>
+                        </div>
 
-                <div class="d-flex justify-content-between" th:if="${tieneRegistros}">
-                    <button type="submit" class="btn-action">
-                        <i class="bi bi-save me-1"></i> Guardar Cambios
-                    </button>
+                        <!-- Botón de guardar (IMPORTANTE: lo habías eliminado) -->
+                        <div class="d-flex justify-content-between">
+                            <button type="submit" class="btn-action btn-nowrap">
+                                <i class="bi bi-save me-1"></i> Guardar Cambios
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </form>
+            <form th:action="@{/asistencias/eliminar-todos-registros}" method="post" class="d-inline"
+                  th:if="${tieneRegistros}">
+                <input type="hidden" name="dni" th:value="${edicionDTO.dni}"/>
+                <input type="hidden" name="fecha"
+                       th:value="${#temporals.format(edicionDTO.fecha, 'yyyy-MM-dd')}"/>
+
+                <button type="submit" class="btn btn-outline-danger mt-2"
+                        onclick="return confirm('¿Está seguro de eliminar TODOS los registros de este día?')">
+                    <i class="bi bi-trash me-1"></i> Eliminar Todos los Registros
+                </button>
+            </form>
+
 
             <!-- Mensajes de éxito/error -->
             <div th:if="${success}" class="alert alert-success mt-3" th:text="${success}"></div>
@@ -105,40 +136,77 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
-    document.getElementById('agregarHorarioBtn').addEventListener('click', function() {
-        const container = document.getElementById('horariosContainer');
-        const index = container.querySelectorAll('.horario-item').length;
+    document.addEventListener('DOMContentLoaded', function() {
+        let registroCount = document.querySelectorAll('.registro-item').length;
 
-        // Crear el nuevo bloque de horario
-        const newCard = document.createElement('div');
-        newCard.classList.add('card', 'mb-4', 'horario-item');
-        newCard.innerHTML = `
-            <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">Horario Adicional</h5>
-                <button type="button" class="btn btn-sm btn-outline-danger eliminarHorarioBtn" title="Eliminar horario">
-                    <i class="bi bi-trash"></i>
-                </button>
-            </div>
-            <div class="card-body">
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <label class="form-label">Hora de Entrada</label>
-                        <input type="time" class="form-control" name="entradas[${index}]" />
+        // Botón único para agregar registro
+        document.getElementById('agregarRegistroBtn').addEventListener('click', function() {
+            agregarRegistro('ENTRADA');
+        });
+
+        // Eliminar registro individual (event delegation)
+        document.addEventListener('click', function(e) {
+            if (e.target.closest('.eliminarRegistroBtn')) {
+                if (confirm('¿Está seguro de eliminar este registro?')) {
+                    e.target.closest('.registro-item').remove();
+                    reindexarRegistros();
+                }
+            }
+        });
+
+        function agregarRegistro(tipo) {
+            const container = document.getElementById('registrosContainer');
+            const index = registroCount++;
+
+            const registroHTML = `
+                <div class="card mb-3 registro-item">
+                    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">Registro Nuevo</h6>
+                        <button type="button" class="btn btn-sm btn-outline-danger eliminarRegistroBtn">
+                            <i class="bi bi-trash"></i> Eliminar
+                        </button>
                     </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Hora de Salida</label>
-                        <input type="time" class="form-control" name="salidas[${index}]" />
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label class="form-label">Tipo</label>
+                                <select class="form-control registro-tipo"
+                                        name="registros[${index}].tipo">
+                                    <option value="ENTRADA" ${tipo === 'ENTRADA' ? 'selected' : ''}>Entrada</option>
+                                    <option value="SALIDA" ${tipo === 'SALIDA' ? 'selected' : ''}>Salida</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Hora</label>
+                                <input type="time" class="form-control registro-hora"
+                                       name="registros[${index}].hora" />
+                            </div>
+                        </div>
+                        <input type="hidden" name="registros[${index}].id" value="" />
                     </div>
                 </div>
-            </div>
-        `;
+            `;
 
-        container.appendChild(newCard);
+            container.insertAdjacentHTML('beforeend', registroHTML);
+        }
 
-        // Agregar funcionalidad al botón de eliminar
-        newCard.querySelector('.eliminarHorarioBtn').addEventListener('click', () => newCard.remove());
+        function reindexarRegistros() {
+            const items = document.querySelectorAll('.registro-item');
+            items.forEach((item, index) => {
+                const inputs = item.querySelectorAll('[name^="registros["]');
+                inputs.forEach(input => {
+                    const name = input.getAttribute('name');
+                    const newName = name.replace(/registros\[\d+\]/, `registros[${index}]`);
+                    input.setAttribute('name', newName);
+                });
+
+                // Actualizar título
+                const title = item.querySelector('h6');
+                title.textContent = `Registro ${index + 1}`;
+            });
+            registroCount = items.length;
+        }
     });
 </script>
-
 </body>
 </html>
