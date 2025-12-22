@@ -856,8 +856,13 @@ public class ExcelService {
 
         // CORRECCIÓN: Simplificar cálculo de horas extras
         double totalExtras = registrosValidos.stream()
+                .filter(d ->
+                        !"FIN_SEMANA".equals(d.getTipoHora()) &&
+                                !"FERIADO".equals(d.getTipoHora())
+                )
                 .mapToDouble(ResumenEmpleadoDTO::getHorasExtras)
                 .sum();
+
 
         double totalFinde = registrosValidos.stream()
                 .filter(d -> "FIN_SEMANA".equals(d.getTipoHora()) || "FERIADO".equals(d.getTipoHora()))
