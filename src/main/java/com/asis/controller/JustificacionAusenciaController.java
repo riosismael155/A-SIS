@@ -11,6 +11,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.time.LocalDate;
 import java.util.Arrays;
@@ -42,24 +43,43 @@ public class JustificacionAusenciaController {
         return "asistencias/justificaciones";
     }
 
-
     @PostMapping("/guardar")
     public String justificarAusencia(@RequestParam("dni") String dni,
                                      @RequestParam("desde") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
                                      @RequestParam(value = "hasta", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta,
                                      @RequestParam("descripcion") String descripcion,
-                                     @RequestParam("tipoAusencia") Ausencia.TipoDeAusencia tipoAusencia) {
+                                     @RequestParam("tipoAusencia") Ausencia.TipoDeAusencia tipoAusencia,
+                                     RedirectAttributes redirectAttributes) {
 
-        if (hasta == null) hasta = desde;
-        justificacionService.justificarAusencia(dni, desde, hasta, descripcion, tipoAusencia);
+        try {
+            if (hasta == null) hasta = desde;
+            justificacionService.justificarAusencia(dni, desde, hasta, descripcion, tipoAusencia);
+
+            // Agregar atributo para mostrar mensaje de éxito
+            redirectAttributes.addFlashAttribute("showSuccess", true);
+
+        } catch (Exception e) {
+            // Agregar atributo para mostrar mensaje de error
+            redirectAttributes.addFlashAttribute("showError", true);
+        }
 
         // Redirigir a la misma página, con la pestaña de listado activa
         return "redirect:/justificaciones/cargar#listado";
     }
 
     @PostMapping("/eliminar/{id}")
-    public String eliminarJustificacion(@PathVariable Long id) {
-        justificacionService.eliminarJustificacion(id);
+    public String eliminarJustificacion(@PathVariable Long id, RedirectAttributes redirectAttributes) {
+        try {
+            justificacionService.eliminarJustificacion(id);
+
+            // Agregar atributo para mostrar mensaje de éxito
+            redirectAttributes.addFlashAttribute("showSuccess", true);
+
+        } catch (Exception e) {
+            // Agregar atributo para mostrar mensaje de error
+            redirectAttributes.addFlashAttribute("showError", true);
+        }
+
         // Redirigir a la misma página con pestaña de listado activa
         return "redirect:/justificaciones/cargar#listado";
     }

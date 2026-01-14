@@ -1,0 +1,14 @@
+<!-- fragments/mensajes.html -->
+<div th:fragment="mostrarMensajes" class="container mt-4">
+    <div th:if="${showSuccess}" class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="fas fa-check-circle me-2"></i>
+        <span>Operación realizada exitosamente</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+
+    <div th:if="${showError}" class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="fas fa-exclamation-circle me-2"></i>
+        <span>Ocurrió un error al procesar la solicitud</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+</div>

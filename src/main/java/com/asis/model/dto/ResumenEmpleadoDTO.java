@@ -70,12 +70,16 @@ public class ResumenEmpleadoDTO {
     private int totalAusenciasJustificadas;
     private boolean muestraCruceMedianoche;
     private LocalTime horaSalidaReal;
+
     // NUEVOS CAMPOS PARA FRANJAS HORARIAS
     private String franjaHorariaId;        // Ej: "T1", "T2", "T3", etc.
     private String tipoFranjaHoraria;      // Ej: "MAÑANA", "TARDE", "NOCHE", etc.
     private int duracionFranjaHoraria;     // Duración esperada de la franja en horas (6 u 8)
     private LocalTime horaInicioFranja;    // Hora de inicio esperada de la franja
     private LocalTime horaFinFranja;
+
+
+
 
 
 // Agregar getter y setter (si usas Lombok @Data, se generan automáticamente)

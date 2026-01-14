@@ -32,6 +32,12 @@ public interface JustificacionAusenciaRepository extends JpaRepository<Ausencia,
     @Query("SELECT a FROM Ausencia a JOIN FETCH a.empleado e ORDER BY a.id DESC")
     List<Ausencia> findAllOrderByIdDesc();
 
+    @Query("SELECT a FROM Ausencia a WHERE a.empleado = :empleado " +
+            "AND (a.desde <= :hasta AND a.hasta >= :desde)")
+    List<Ausencia> findByEmpleadoAndFechasSolapadas(
+            @Param("empleado") Empleado empleado,
+            @Param("desde") LocalDate desde,
+            @Param("hasta") LocalDate hasta);
 
 
 

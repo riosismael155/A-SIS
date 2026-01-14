@@ -44,11 +44,7 @@ public class EmpleadoDTO {
         this.horaEntrada2 = format(e.getHoraEntrada2());
         this.horaSalida2 = format(e.getHoraSalida2());
 
-        this.horaEntrada3 = format(e.getHoraEntrada3());
-        this.horaSalida3 = format(e.getHoraSalida3());
-        this.noCumpleHorarioNormal = e.isNoCumpleHorarioNormal();
-        this.horaEntrada4 = format(e.getHoraEntrada4());
-        this.horaSalida4 = format(e.getHoraSalida4());
+
 
         this.flexMinutos = e.getFlexMinutos();
 
