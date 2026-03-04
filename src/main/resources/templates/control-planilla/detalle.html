@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Detalle Control Planilla</title>
+    <style>
+        /* Estilos existentes */
+        table {
+          border-collapse: collapse;
+          width: 100%;
+        }
+        th, td {
+          border: 1px solid #ddd;
+          padding: 8px;
+          text-align: left;
+        }
+        th {
+          background-color: #f2f2f2;
+        }
+        .mensual {
+          background-color: #e8f4f8;
+          font-weight: bold;
+        }
+        .separador {
+          border-left: 2px solid #999;
+        }
+        input[type=number] {
+            width: 80px;
+        }
+
+        /* NUEVOS ESTILOS PARA PESTAÑAS */
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #28a745;
+        }
+
+        .tab-button {
+            padding: 12px 24px;
+            background-color: #f1f1f1;
+            border: none;
+            border-radius: 5px 5px 0 0;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            margin-right: 5px;
+            transition: background-color 0.3s;
+        }
+
+        .tab-button:hover {
+            background-color: #ddd;
+        }
+
+        .tab-button.active {
+            background-color: #28a745;
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-top: none;
+            border-radius: 0 0 5px 5px;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Estilos para observaciones */
+        .observaciones-area {
+            width: 100%;
+            min-height: 200px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            resize: vertical;
+            margin-bottom: 20px;
+        }
+
+        .observaciones-label {
+            font-weight: bold;
+            margin-bottom: 10px;
+            display: block;
+            color: #333;
+        }
+
+        .observaciones-info {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #28a745;
+            margin-bottom: 20px;
+        }
+
+        .observaciones-fecha {
+            color: #666;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+
+        .btn-guardar-obs {
+            background-color: #28a745;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .btn-guardar-obs:hover {
+            background-color: #218838;
+        }
+
+        .observacion-item {
+            background-color: white;
+            border: 1px solid #eee;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+        }
+
+        .observacion-item strong {
+            color: #28a745;
+        }
+
+        .observacion-fecha {
+            color: #999;
+            font-size: 0.8em;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+
+<h1 th:text="${control.nombre}">Control</h1>
+
+<p>
+    <strong>Período:</strong>
+    <span th:text="${#temporals.format(control.desde, 'dd/MM/yyyy')}"></span>
+    →
+    <span th:text="${#temporals.format(control.hasta, 'dd/MM/yyyy')}"></span>
+</p>
+
+<!-- Navegación de semanas (ahora visible en ambas pestañas) -->
+<div style="margin-bottom: 20px;">
+    <a th:if="${semanaAnterior != null}"
+       th:href="@{/control-planilla/{id}(id=${control.id}, semanaId=${semanaAnterior.id})}">
+        ⬅ Semana anterior
+    </a>
+
+    <strong>
+        <span th:text="${#temporals.format(semana.desde, 'dd/MM/yyyy')}"></span>
+        →
+        <span th:text="${#temporals.format(semana.hasta, 'dd/MM/yyyy')}"></span>
+    </strong>
+
+    <a th:if="${semanaSiguiente != null}"
+       th:href="@{/control-planilla/{id}(id=${control.id}, semanaId=${semanaSiguiente.id})}">
+        Semana siguiente ➡
+    </a>
+</div>
+
+<hr>
+
+<!-- PESTAÑAS -->
+<div class="tabs">
+    <button class="tab-button active" onclick="openTab(event, 'semana-tab')">📅 Semana Actual</button>
+    <button class="tab-button" onclick="openTab(event, 'observaciones-tab')">📝 Observaciones</button>
+</div>
+
+<!-- CONTENIDO DE PESTAÑA 1: SEMANA ACTUAL -->
+<div id="semana-tab" class="tab-content active">
+    <h2>Empleados de esta semana</h2>
+
+    <form th:action="@{/control-planilla/guardar}" method="post">
+        <input type="hidden" name="semanaId" th:value="${semana.id}"/>
+
+        <table border="1" cellpadding="5">
+            <thead>
+            <tr>
+                <th rowspan="2">Empleado</th>
+                <th colspan="2" class="separador">Horas 50%</th>
+                <th colspan="2">Horas 100%</th>
+                <th colspan="2">Guardias</th>
+            </tr>
+            <tr>
+                <th class="separador">Semana</th>
+                <th class="mensual">Total Mensual</th>
+                <th>Semana</th>
+                <th class="mensual">Total Mensual</th>
+                <th>Semana</th>
+                <th class="mensual">Total Mensual</th>
+            </tr>
+            </thead>
+
+            <tbody>
+            <tr th:each="se, i : ${empleadosSemana}">
+                <td th:text="${se.empleado.apellido + ', ' + se.empleado.nombre}"></td>
+
+                <input type="hidden"
+                       th:name="'items[' + ${i.index} + '].id'"
+                       th:value="${se.id}"/>
+
+                <td class="separador">
+                    <input type="number"
+                           th:name="'items[' + ${i.index} + '].totalHorasExtra'"
+                           th:value="${se.totalHorasExtra}"
+                           min="0"
+                           step="0.5"/>
+                </td>
+
+                <td class="mensual"
+                    th:text="${totalesMensualesPorEmpleado[se.empleado.id]?.totalHorasExtra != null ?
+                              #numbers.formatDecimal(totalesMensualesPorEmpleado[se.empleado.id].totalHorasExtra, 1, 2) : '0.00'}">
+                </td>
+
+                <td>
+                    <input type="number"
+                           th:name="'items[' + ${i.index} + '].totalFindeFeriado'"
+                           th:value="${se.totalFindeFeriado}"
+                           min="0"
+                           step="0.5"/>
+                </td>
+
+                <td class="mensual"
+                    th:text="${totalesMensualesPorEmpleado[se.empleado.id]?.totalFindeFeriado != null ?
+                              #numbers.formatDecimal(totalesMensualesPorEmpleado[se.empleado.id].totalFindeFeriado, 1, 2) : '0.00'}">
+                </td>
+
+                <td>
+                    <input type="number"
+                           th:name="'items[' + ${i.index} + '].totalGuardias'"
+                           th:value="${se.totalGuardias}"
+                           min="0"/>
+                </td>
+
+                <td class="mensual"
+                    th:text="${totalesMensualesPorEmpleado[se.empleado.id]?.totalGuardias != null ?
+                              totalesMensualesPorEmpleado[se.empleado.id].totalGuardias : 0}">
+                </td>
+            </tr>
+            </tbody>
+        </table>
+
+        <br>
+        <button type="submit">💾 Guardar cambios</button>
+    </form>
+
+    <hr>
+
+    <!-- Formulario para agregar empleado -->
+    <form th:action="@{/semana-empleado/agregar}" method="post">
+        <input type="hidden" name="semanaId" th:value="${semana.id}">
+        <input type="hidden" name="controlPlanillaId" th:value="${control.id}">
+
+        <select name="empleadoId" required>
+            <option value="">-- Seleccionar empleado --</option>
+            <option th:each="e : ${empleados}"
+                    th:value="${e.id}"
+                    th:text="${e.apellido + ', ' + e.nombre}">
+            </option>
+        </select>
+
+        <button type="submit">Agregar</button>
+    </form>
+</div>
+
+<!-- CONTENIDO DE PESTAÑA 2: OBSERVACIONES -->
+<div id="observaciones-tab" class="tab-content">
+    <h2>Observaciones del Período</h2>
+
+    <div class="observaciones-info">
+        <p><strong>Período:</strong>
+            <span th:text="${#temporals.format(control.desde, 'dd/MM/yyyy')}"></span>
+            →
+            <span th:text="${#temporals.format(control.hasta, 'dd/MM/yyyy')}"></span>
+        </p>
+        <p><strong>Semana actual:</strong>
+            <span th:text="${#temporals.format(semana.desde, 'dd/MM/yyyy')}"></span>
+            →
+            <span th:text="${#temporals.format(semana.hasta, 'dd/MM/yyyy')}"></span>
+        </p>
+    </div>
+
+    <!-- Formulario para editar observaciones -->
+    <form th:action="@{/control-planilla/{id}/observaciones(id=${control.id})}" method="post">
+        <input type="hidden" name="semanaId" th:value="${semana.id}">
+
+        <label for="observaciones" class="observaciones-label">Observaciones:</label>
+        <textarea id="observaciones"
+                  name="observaciones"
+                  class="observaciones-area"
+                  placeholder="Escribe aquí las observaciones para este control de planilla..."
+                  th:text="${control.observaciones}"></textarea>  <!-- ← CORREGIDO: th:text en lugar de ${} directo -->
+
+        <div style="display: flex; gap: 10px;">
+            <button type="submit" class="btn-guardar-obs">💾 Guardar observaciones</button>
+
+        </div>
+    </form>
+</div>
+<br>
+<a th:href="@{/control-planilla}">⬅ Volver al listado</a>
+
+<!-- JavaScript para las pestañas -->
+<script>
+    function openTab(evt, tabName) {
+        // Ocultar todo el contenido de pestañas
+        var tabContents = document.getElementsByClassName("tab-content");
+        for (var i = 0; i < tabContents.length; i++) {
+            tabContents[i].classList.remove("active");
+        }
+
+        // Quitar la clase active de todos los botones
+        var tabButtons = document.getElementsByClassName("tab-button");
+        for (var i = 0; i < tabButtons.length; i++) {
+            tabButtons[i].classList.remove("active");
+        }
+
+        // Mostrar la pestaña actual y marcar el botón como activo
+        document.getElementById(tabName).classList.add("active");
+        evt.currentTarget.classList.add("active");
+    }
+</script>
+
+</body>
+</html>

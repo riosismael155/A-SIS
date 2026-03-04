@@ -57,6 +57,17 @@ public class Empleado {
     private Rol rol;
 
 
+    @OneToMany(mappedBy = "empleado", cascade = CascadeType.ALL, orphanRemoval = true)
+    @ToString.Exclude
+    private List<HoraEnPlanilla> horasEnPlanilla;
+
+    @OneToMany(mappedBy = "empleado", cascade = CascadeType.ALL, orphanRemoval = true)
+    @ToString.Exclude
+    private List<Guardia> guardias;
+
+    //(Esto es opcional, pero útil para reportes)
+    @OneToMany(mappedBy = "empleado")
+    private List<SemanaEmpleado> semanas;
 
     public enum TipoContrato {
         SERVICIO("de Servicio"),

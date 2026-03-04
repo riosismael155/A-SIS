@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Crear Control Planilla</title>
+</head>
+<body>
+
+<h2>Crear Control Planilla</h2>
+
+<form th:action="@{/control-planilla/crear}" method="post">
+    <label>Descripción (opcional):</label>
+    <input type="text" name="descripcion">
+
+    <br><br>
+    <button type="submit">Crear</button>
+</form>
+
+</body>
+</html>

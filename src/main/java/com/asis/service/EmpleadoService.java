@@ -4,6 +4,7 @@ import com.asis.model.Empleado;
 import com.asis.repository.EmpleadoRepository;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -28,4 +29,14 @@ public class EmpleadoService {
         }
         return false;
     }
+    public Empleado findById(Long id) {
+        return empleadoRepository.findById(id)
+                .orElseThrow(() ->
+                        new IllegalArgumentException("Empleado no encontrado"));
+    }
+
+    public List<Empleado> findAll() {
+        return empleadoRepository.findAll();
+    }
+
 }
