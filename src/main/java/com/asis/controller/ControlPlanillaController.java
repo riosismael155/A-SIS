@@ -15,6 +15,8 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
@@ -47,9 +49,21 @@ public class ControlPlanillaController {
     }
 
     @PostMapping("/crear")
-    public String crear() {
+    public String crear(@RequestParam(required = false) String desde,
+                        @RequestParam(required = false) String hasta,
+                        @RequestParam(required = false) String observaciones) {
 
-        ControlPlanilla cp = controlService.crearControlPlanilla(null);
+        ControlPlanilla cp;
+
+        if (desde != null && hasta != null && !desde.isEmpty() && !hasta.isEmpty()) {
+            // Convertir las fechas del formato String a LocalDate
+            LocalDate fechaDesde = LocalDate.parse(desde);
+            LocalDate fechaHasta = LocalDate.parse(hasta);
+            cp = controlService.crearControlPlanilla(fechaDesde, fechaHasta, observaciones);
+        } else {
+            // Si no se proporcionan fechas, usar el comportamiento anterior (automático)
+            cp = controlService.crearControlPlanilla(null);
+        }
 
         return "redirect:/control-planilla/" + cp.getId();
     }
@@ -71,38 +85,27 @@ public class ControlPlanillaController {
         model.addAttribute("semanaAnterior", semanaService.getAnterior(cp, semana));
         model.addAttribute("semanaSiguiente", semanaService.getSiguiente(cp, semana));
 
-        // Empleados de la semana actual
+        // Empleados de la semana actual - ORDENADOS POR APELLIDO
         List<SemanaEmpleado> empleadosSemana = semanaEmpleadoService.findBySemana(semana);
-        model.addAttribute("empleadosSemana", empleadosSemana);
 
-        // LOG: qué empleados están en la semana actual
-        System.out.println("=== EMPLEADOS EN SEMANA ACTUAL ===");
-        for (SemanaEmpleado se : empleadosSemana) {
-            System.out.println("Semana actual - Empleado ID: " + se.getEmpleado().getId() +
-                    " | Nombre: " + se.getEmpleado().getApellido() + ", " + se.getEmpleado().getNombre());
+        // Ordenar por apellido del empleado
+        if (empleadosSemana != null && !empleadosSemana.isEmpty()) {
+            empleadosSemana.sort(Comparator.comparing(
+                    se -> se.getEmpleado() != null ? se.getEmpleado().getApellido() : "",
+                    String.CASE_INSENSITIVE_ORDER
+            ));
         }
 
-        // AHORA PASAMOS LOS EMPLEADOS DE LA SEMANA al método
+        model.addAttribute("empleadosSemana", empleadosSemana);
+
+        // Calcular totales mensuales
         TotalesMensualesDTO totalesMensuales = semanaEmpleadoService.calcularTotalesPeriodo(
-                empleadosSemana,  // ← PASAMOS ESTA LISTA
+                empleadosSemana,
                 cp.getDesde(),
                 cp.getHasta()
         );
 
-        // LOG: qué totales mensuales tenemos para los empleados de la semana
-        System.out.println("=== TOTALES MENSUALES (SOLO EMPLEADOS DE LA SEMANA) ===");
-        for (Map.Entry<Long, TotalesEmpleadoDTO> entry :
-                totalesMensuales.getTotalesPorEmpleado().entrySet()) {
-            System.out.println("Empleado ID: " + entry.getKey() +
-                    " | Nombre: " + entry.getValue().getNombreEmpleado() +
-                    " | Horas50: " + entry.getValue().getTotalHorasExtra() +
-                    " | Horas100: " + entry.getValue().getTotalFindeFeriado() +
-                    " | Guardias: " + entry.getValue().getTotalGuardias());
-        }
-
         model.addAttribute("totalesMensualesPorEmpleado", totalesMensuales.getTotalesPorEmpleado());
-        // Si no necesitas totales generales, no los agregues
-        // model.addAttribute("totalesGeneralesMensuales", totalesMensuales.getTotalesGenerales());
 
         // Empleados disponibles para agregar
         model.addAttribute("empleados", empleadoService.findAll());

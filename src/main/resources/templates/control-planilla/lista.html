@@ -1,68 +1,109 @@
 <!DOCTYPE html>
 <html lang="es" xmlns:th="http://www.thymeleaf.org">
-<head>
-    <meta charset="UTF-8">
-    <title>Control de Planillas</title>
-    <style>
-        .acciones {
-            white-space: nowrap;
-        }
-        .btn {
-            padding: 5px 10px;
-            margin: 0 2px;
-            text-decoration: none;
-            border-radius: 3px;
-            color: white;
-            display: inline-block;
-        }
-        .btn-detalle {
-            background-color: #007bff;
-        }
-        .btn-resumen {
-            background-color: #28a745;
-        }
-    </style>
+<head th:replace="fragments/header :: head('Control de Planillas')">
+    <link rel="icon" th:href="@{/favicon.ico}" type="image/x-icon"/>
 </head>
 <body>
 
-<h1>Control de Planillas</h1>
+<div th:replace="fragments/header :: body"></div>
 
-<!-- Crear nuevo -->
-<form th:action="@{/control-planilla/crear}" method="post">
-    <button type="submit">➕ Crear nuevo control</button>
-</form>
+<main class="flex-fill">
+    <div class="container">
+        <div class="bloque-elevado px-5 py-4 mt-container">
 
-<hr>
+            <!-- Encabezado y botón crear en la misma fila -->
+            <div class="d-flex align-items-center justify-content-between mb-4">
+                <div class="d-flex align-items-center">
+                    <a href="/"
+                       class="me-3 color-iconos d-flex align-items-center"
+                       title="Volver atrás">
+                        <i class="bi bi-arrow-left-circle me-1 fs-5"></i>
+                    </a>
+                    <i class="bi bi-file-spreadsheet fs-5 me-2 color-iconos"></i>
+                    <h4 class="mb-0 text-h">Control de Planillas</h4>
+                </div>
 
-<h2>Planillas creadas</h2>
+                <!-- Botón Crear nuevo que abre el modal -->
+                <button type="button" class="btn-action" data-bs-toggle="modal" data-bs-target="#crearPlanillaModal">
+                    <i class="bi bi-save me-1"></i> Crear nueva planilla
+                </button>
+            </div>
 
-<table border="1" cellpadding="5">
-    <thead>
-    <tr>
-        <th>Nombre</th>
-        <th>Desde</th>
-        <th>Hasta</th>
-        <th>Acciones</th>
-    </tr>
-    </thead>
-    <tbody>
-    <tr th:each="cp : ${controles}">
-        <td th:text="${cp.nombre}">nombre</td>
-        <td th:text="${#temporals.format(cp.desde, 'dd/MM/yyyy')}">desde</td>
-        <td th:text="${#temporals.format(cp.hasta, 'dd/MM/yyyy')}">hasta</td>
-        <td class="acciones">
-            <a class="btn btn-detalle"
-               th:href="@{/control-planilla/{id}(id=${cp.id})}">
-                Ver detalle
-            </a>
-            <a class="btn btn-resumen"
-               th:href="@{/control-planilla/{id}/resumen(id=${cp.id})}">
-                Ver resumen mensual
-            </a>
-        </td>
-    </tr>
-    </tbody>
-</table>
+            <!-- Tabla de planillas -->
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover table-excel">
+                    <thead class="table-dark">
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Desde</th>
+                        <th>Hasta</th>
+                        <th>Acciones</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="cp : ${controles}">
+                        <td th:text="${cp.nombre}">Planilla Ejemplo</td>
+                        <td th:text="${#temporals.format(cp.desde, 'dd/MM/yyyy')}">01/01/2024</td>
+                        <td th:text="${#temporals.format(cp.hasta, 'dd/MM/yyyy')}">31/01/2024</td>
+                        <td class="position-relative text-nowrap" style="width: 1%;">
+                            <div class="d-flex align-items-center gap-2">
+                                <!-- Botón Ver Detalle -->
+                                <a th:href="@{/control-planilla/{id}(id=${cp.id})}"
+                                   class="btn btn-outline-primary btn-sm">
+                                    <i class="bi bi-eye"></i> Ver detalle
+                                </a>
+
+                                <!-- Botón Ver Resumen -->
+                                <a th:href="@{/control-planilla/{id}/resumen(id=${cp.id})}"
+                                   class="btn btn-outline-primary btn-sm">
+                                    <i class="bi bi-file-text"></i> Ver resumen mensual
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr th:if="${#lists.isEmpty(controles)}">
+                        <td colspan="4" class="text-center">No hay planillas registradas.</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
+    </div>
+</main>
+
+<!-- Modal simple para crear nueva planilla (solo fechas) -->
+<div class="modal fade" id="crearPlanillaModal" tabindex="-1" aria-labelledby="crearPlanillaModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="crearPlanillaModalLabel">Nueva planilla</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form th:action="@{/control-planilla/crear}" method="post">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="desde" class="form-label">Desde:</label>
+                        <input type="date" class="form-control" id="desde" name="desde" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="hasta" class="form-label">Hasta:</label>
+                        <input type="date" class="form-control" id="hasta" name="hasta" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Crear</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div th:replace="fragments/footer :: footer"></div>
+
+<!-- Bootstrap Bundle con Popper -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
 </body>
 </html>

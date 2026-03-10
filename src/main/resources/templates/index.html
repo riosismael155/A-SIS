@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="es" xmlns:th="http://www.thymeleaf.org">
-<head th:replace="fragments/header :: head('Inicio')"><link rel="icon" th:href="@{/favicon.ico}" type="image/x-icon"/></head>
+<head th:replace="fragments/header :: head('Inicio')">
+    <link rel="icon" th:href="@{/favicon.ico}" type="image/x-icon"/>
+</head>
 <body>
 
 <div th:replace="fragments/header :: body"></div>
@@ -10,7 +12,6 @@
             <main class="flex-fill d-flex align-items-center justify-content-center p-0">
                 <div class="container">
                     <div class="row g-4 justify-content-center accesos-directos">
-
                         <!-- SECCIÓN ASISTENCIAS (Azul) -->
                         <div class="col-md-4">
                             <a th:href="@{/asistencias/detalle}" class="text-decoration-none">
@@ -88,15 +89,28 @@
                             </a>
                         </div>
 
-                        <!-- SECCIÓN DOCUMENTACIÓN (Gris) -->
+                        <!-- NUEVO: CONTROL DE PLANILLAS (Naranja Claro) -->
                         <div class="col-md-4 mt-0">
-                            <a th:href="@{/manual}" class="text-decoration-none">
+                            <a th:href="@{/control-planilla}" class="text-decoration-none">
                                 <div class="shortcut-card acceso">
-                                    <i class="bi bi-book icono text-secondary"></i>
-                                    <h5>Manual de Usuario</h5>
+                                    <i class="bi bi-file-spreadsheet icono text-warning"
+                                       style="color: #ffb347 !important;"></i>
+                                    <h5>Control de Planillas</h5>
                                 </div>
                             </a>
                         </div>
+
+                        <!-- SECCIÓN DOCUMENTACIÓN (Gris) - OCUPA FILA COMPLETA -->
+                        <div class="col-12 mt-0">
+                            <a th:href="@{/manual}" class="text-decoration-none">
+                                <div class="shortcut-card acceso d-flex align-items-center justify-content-center"
+                                     style="gap: 15px; padding-left: 20px;">
+                                    <i class="bi bi-book icono text-secondary"></i>
+                                    <h5 style="margin: 0;">Manual de Usuario</h5>
+                                </div>
+                            </a>
+                        </div>
+
 
                     </div>
                 </div>

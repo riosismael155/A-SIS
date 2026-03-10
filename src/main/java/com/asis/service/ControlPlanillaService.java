@@ -27,13 +27,7 @@ public class ControlPlanillaService {
     /**
      * Crea un ControlPlanilla usando la fecha actual del sistema
      */
-    public ControlPlanilla crearControlPlanilla(String observaciones) {
-
-        LocalDate hoy = LocalDate.now();
-
-        LocalDate desde = hoy.withDayOfMonth(21);
-        LocalDate hasta = hoy.plusMonths(1).withDayOfMonth(20);
-
+    public ControlPlanilla crearControlPlanilla(LocalDate desde, LocalDate hasta, String observaciones) {
         String nombre = generarNombre(desde, hasta);
 
         ControlPlanilla control = new ControlPlanilla();
@@ -52,6 +46,14 @@ public class ControlPlanillaService {
         return controlPlanillaRepository.save(control);
     }
 
+    // Mantén el método original para compatibilidad
+    public ControlPlanilla crearControlPlanilla(String observaciones) {
+        LocalDate hoy = LocalDate.now();
+        LocalDate desde = hoy.withDayOfMonth(21);
+        LocalDate hasta = hoy.plusMonths(1).withDayOfMonth(20);
+
+        return crearControlPlanilla(desde, hasta, observaciones);
+    }
 
 
     private String generarNombre(LocalDate desde, LocalDate hasta) {

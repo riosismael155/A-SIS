@@ -1,185 +1,146 @@
 <!DOCTYPE html>
 <html lang="es" xmlns:th="http://www.thymeleaf.org">
-<head>
-  <meta charset="UTF-8">
-  <title>Resumen Mensual - Control Planilla</title>
-  <style>
-    body {
-        font-family: Arial, sans-serif;
-        margin: 20px;
-    }
-    h1, h2, h3 {
-        color: #333;
-    }
-    .info-periodo {
-        background-color: #f5f5f5;
-        padding: 15px;
-        border-radius: 5px;
-        margin: 20px 0;
-        border-left: 4px solid #28a745;
-    }
-    .tipo-contrato {
-        margin-top: 30px;
-        margin-bottom: 10px;
-        padding: 10px;
-        background-color: #e9ecef;
-        border-radius: 5px;
-        border-left: 4px solid #007bff;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-    .tipo-contrato h3 {
-        margin: 0;
-        color: #0056b3;
-    }
-    .badge-subtotal {
-        background-color: #17a2b8;
-        color: white;
-        padding: 5px 10px;
-        border-radius: 15px;
-        font-size: 0.9em;
-    }
-    table {
-        border-collapse: collapse;
-        width: 100%;
-        margin-top: 10px;
-        margin-bottom: 20px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    th, td {
-        border: 1px solid #ddd;
-        padding: 12px;
-        text-align: left;
-    }
-    th {
-        background-color: #28a745;
-        color: white;
-        font-weight: bold;
-    }
-    tr:nth-child(even) {
-        background-color: #f9f9f9;
-    }
-    tr:hover {
-        background-color: #f5f5f5;
-    }
-    .numero {
-        text-align: right;
-        font-family: monospace;
-        font-size: 1.1em;
-    }
-    .subtotal-row {
-        background-color: #e8f4f8;
-        font-weight: bold;
-        border-top: 2px solid #007bff;
-        border-bottom: 2px solid #007bff;
-    }
-    .totales-generales {
-        background-color: #28a745;
-        color: white;
-        font-weight: bold;
-        font-size: 1.1em;
-    }
-    .btn-volver {
-        display: inline-block;
-        margin-top: 20px;
-        margin-right: 10px;
-        padding: 10px 20px;
-        background-color: #6c757d;
-        color: white;
-        text-decoration: none;
-        border-radius: 5px;
-    }
-    .btn-volver:hover {
-        background-color: #5a6268;
-    }
-    .sin-datos {
-        text-align: center;
-        padding: 40px;
-        color: #666;
-        font-style: italic;
-    }
-  </style>
+<head th:replace="fragments/header :: head('Resumen Mensual - Control Planilla')">
+  <link rel="icon" th:href="@{/favicon.ico}" type="image/x-icon"/>
 </head>
+<style>
+  /* Cuadritos de leyenda (mantenemos por si se necesitan en el futuro) */
+  .legend-box {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      border-radius: 3px;
+      border: 1px solid rgba(0,0,0,0.1);
+  }
+
+  /* Ajuste visual en modo oscuro */
+  .table-dark .legend-box {
+      border-color: rgba(255,255,255,0.3);
+  }
+</style>
 <body>
+<div th:replace="fragments/header :: body"></div>
 
-<h1 th:text="'Resumen Mensual - ' + ${control.nombre}">Resumen Mensual</h1>
+<main class="flex-fill">
+  <div class="container">
+    <div class="bloque-elevado px-5 py-4 mt-container">
 
-<div class="info-periodo">
-  <p>
-    <strong>Período:</strong>
-    <span th:text="${#temporals.format(control.desde, 'dd/MM/yyyy')}"></span>
-    →
-    <span th:text="${#temporals.format(control.hasta, 'dd/MM/yyyy')}"></span>
-  </p>
-  <p>
-    <strong>Total de empleados:</strong>
-    <span th:text="${totalesMensuales.totalesPorEmpleado.size()}"></span>
-  </p>
-</div>
+      <!-- Header con título y botón volver -->
+      <div class="d-flex align-items-center mb-4">
+        <a th:href="@{/control-planilla}"
+           class="me-3 color-iconos d-flex align-items-center"
+           title="Volver al detalle semanal">
+          <i class="bi bi-arrow-left-circle me-1 fs-5"></i>
+        </a>
+        <i class="bi bi-calendar-check fs-5 me-2 color-iconos"></i>
+        <h4 class="mb-0 text-h" th:text="'Resumen Mensual - ' + ${control.nombre}">Resumen Mensual</h4>
+      </div>
 
-<!-- Mostrar empleados agrupados por tipo de contrato -->
-<div th:if="${not #maps.isEmpty(totalesMensuales.empleadosPorTipoContrato)}">
+      <!-- Información del período -->
+      <div class="info-periodo bg-light p-3 rounded-3 mb-4 border-start border-4 border-success">
+        <div class="row align-items-center">
+          <div class="col-md-8">
+            <p class="mb-1">
+              <strong>Período:</strong>
+              <span th:text="${#temporals.format(control.desde, 'dd/MM/yyyy')}"></span>
+              →
+              <span th:text="${#temporals.format(control.hasta, 'dd/MM/yyyy')}"></span>
+            </p>
+            <p class="mb-0">
+              <strong>Total de empleados:</strong>
+              <span class="badge bg-secondary" th:text="${totalesMensuales.totalesPorEmpleado.size()}"></span>
+            </p>
+          </div>
+          <div class="col-md-4 text-md-end mt-2 mt-md-0">
+            <a th:href="@{/control-planilla/{id}(id=${control.id})}"
+               class="btn btn-outline-primary btn-sm">
+              <i class="bi bi-eye me-1"></i> Ver en detalle            </a>
+          </div>
+        </div>
+      </div>
 
-  <div th:each="entry : ${totalesMensuales.empleadosPorTipoContrato}">
-    <!-- Cabecera del tipo de contrato -->
-    <div class="tipo-contrato">
-      <h3 th:text="'📋 ' + ${entry.key}">Tipo de Contrato</h3>
-      <span class="badge-subtotal"
-            th:text="${#lists.size(entry.value)} + ' empleados'">
-            </span>
+      <!-- Mostrar empleados agrupados por tipo de contrato -->
+      <div th:if="${not #maps.isEmpty(totalesMensuales.empleadosPorTipoContrato)}">
+
+        <div th:each="entry : ${totalesMensuales.empleadosPorTipoContrato}" class="mb-5">
+          <!-- Cabecera del tipo de contrato -->
+          <div class="d-flex justify-content-between align-items-center p-3 mb-3 rounded-3"
+               style="background-color: #e9ecef; border-left: 4px solid #0d6efd;">
+            <h5 class="mb-0 text-primary" th:text="'📋 ' + ${entry.key}">
+              Tipo de Contrato
+            </h5>
+            <span class="badge bg-info text-white rounded-pill px-3 py-2"
+                  th:text="${#lists.size(entry.value)} + ' empleados'">
+                        </span>
+          </div>
+
+          <!-- Tabla de empleados de este tipo -->
+          <div class="table-responsive">
+            <table class="table table-bordered table-hover">
+              <thead class="table-dark">
+              <tr>
+                <th>Empleado</th>
+                <th>Horas 50%</th>
+                <th>Horas 100%</th>
+                <th>Guardias</th>
+              </tr>
+              </thead>
+              <tbody>
+              <tr th:each="empleado : ${entry.value}">
+                <td th:text="${empleado.nombreEmpleado}">Apellido, Nombre</td>
+                <td class="text-end font-monospace"
+                    th:text="${#numbers.formatDecimal(empleado.totalHorasExtra, 1, 2)} + ' hs'">
+                  0.00 hs
+                </td>
+                <td class="text-end font-monospace"
+                    th:text="${#numbers.formatDecimal(empleado.totalFindeFeriado, 1, 2)} + ' hs'">
+                  0.00 hs
+                </td>
+                <td class="text-end font-monospace"
+                    th:text="${empleado.totalGuardias} + ' guardia' + ${empleado.totalGuardias != 1 ? 's' : ''}">
+                  0 guardias
+                </td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Totales generales (opcional, podrías agregarlos si tenés los datos) -->
+        <div th:if="${totalesMensuales.totalesGenerales != null}"
+             class="mt-4 p-3 bg-success text-white rounded-3 fw-bold">
+          <div class="row">
+            <div class="col-md-3">
+              <span>Totales del período:</span>
+            </div>
+            <div class="col-md-3">
+              Horas 50%: <span th:text="${#numbers.formatDecimal(totalesMensuales.totalesGenerales.totalHorasExtra, 1, 2)} + ' hs'"></span>
+            </div>
+            <div class="col-md-3">
+              Horas 100%: <span th:text="${#numbers.formatDecimal(totalesMensuales.totalesGenerales.totalFindeFeriado, 1, 2)} + ' hs'"></span>
+            </div>
+            <div class="col-md-3">
+              Guardias: <span th:text="${totalesMensuales.totalesGenerales.totalGuardias}"></span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Mensaje si no hay datos -->
+      <div th:if="${#maps.isEmpty(totalesMensuales.empleadosPorTipoContrato)}"
+           class="text-center py-5 text-secondary fst-italic">
+        <i class="bi bi-inbox fs-1 d-block mb-3"></i>
+        <p class="mb-0">No hay registros de horas o guardias para este período</p>
+      </div>
+
     </div>
-
-    <!-- Tabla de empleados de este tipo -->
-    <table>
-      <thead>
-      <tr>
-        <th>Empleado</th>
-        <th>Horas 50%</th>
-        <th>Horas 100%</th>
-        <th>Guardias</th>
-      </tr>
-      </thead>
-      <tbody>
-      <tr th:each="empleado : ${entry.value}">
-        <td th:text="${empleado.nombreEmpleado}">Apellido, Nombre</td>
-        <td class="numero"
-            th:text="${#numbers.formatDecimal(empleado.totalHorasExtra, 1, 2)} + ' hs'">
-          0.00 hs
-        </td>
-        <td class="numero"
-            th:text="${#numbers.formatDecimal(empleado.totalFindeFeriado, 1, 2)} + ' hs'">
-          0.00 hs
-        </td>
-        <td class="numero"
-            th:text="${empleado.totalGuardias} + ' guardia' + ${empleado.totalGuardias != 1 ? 's' : ''}">
-          0 guardias
-        </td>
-      </tr>
-
-
-      </tbody>
-    </table>
   </div>
+</main>
 
+<div th:replace="fragments/footer :: footer"></div>
 
-</div>
-
-<!-- Mensaje si no hay datos -->
-<div th:if="${#maps.isEmpty(totalesMensuales.empleadosPorTipoContrato)}" class="sin-datos">
-  <p>No hay registros de horas o guardias para este período</p>
-</div>
-
-<!-- Botones de navegación -->
-<div style="margin-top: 30px;">
-  <a class="btn-volver" th:href="@{/control-planilla/{id}(id=${control.id})}">
-    ⬅ Volver al detalle semanal
-  </a>
-  <a class="btn-volver" th:href="@{/control-planilla}"
-     style="background-color: #007bff;">
-    ⬅ Volver al listado
-  </a>
-</div>
-
+<!-- Script de navegación si es necesario -->
+<script th:src="@{/js/navigation.js}" defer></script>
 </body>
 </html>

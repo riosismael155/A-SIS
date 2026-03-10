@@ -138,3 +138,35 @@ function setearDatosEmpleado(e) {
         }
     });
 });
+
+// Modificación específica para el formulario de agregar empleado a semana
+// Esta función complementa el código existente sin reemplazarlo
+
+// Para el formulario de agregar empleado, necesitamos que al hacer click en una sugerencia
+// se complete el input visible y el campo oculto con el DNI
+document.addEventListener('DOMContentLoaded', function() {
+    // Verificamos si estamos en la página de control de planilla
+    const formAgregarEmpleado = document.querySelector('form[action*="/semana-empleado/agregar"]');
+
+    if (formAgregarEmpleado) {
+        const inputEmpleado = document.getElementById('empleado');
+        const inputDni = document.getElementById('dniBusqueda');
+        const sugerencias = document.getElementById('sugerencias');
+
+        // Sobrescribimos el evento de click para las sugerencias específicamente para este formulario
+        if (sugerencias) {
+            sugerencias.addEventListener('click', function(e) {
+                const sugerencia = e.target.closest('.list-group-item');
+                if (sugerencia) {
+                    e.preventDefault();
+                    inputEmpleado.value = sugerencia.textContent.split(' - ')[0]; // Solo nombre y apellido
+                    if (inputDni) {
+                        inputDni.value = sugerencia.dataset.dni;
+                    }
+                    sugerencias.innerHTML = '';
+                    sugerencias.style.display = 'none';
+                }
+            });
+        }
+    }
+});
