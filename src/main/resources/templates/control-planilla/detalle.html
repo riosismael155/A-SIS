@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html lang="es" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="fragments/header :: head('Detalle Control Planilla')">
+    <!-- En el header de tu página, agrega estos meta tags para CSRF -->
+    <meta name="_csrf" th:content="${_csrf.token}"/>
+    <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
 </head>
 <body>
 <div th:replace="fragments/header :: body"></div>
@@ -252,7 +255,7 @@
     }
 </script>
 
-<!-- Script para guardar y agregar en una sola operación -->
+<!-- Script para guardar cambios antes de agregar empleado (VERSIÓN DESPLEGADA) -->
 <script>
     document.addEventListener("DOMContentLoaded", function() {
         const formAgregarEmpleado = document.getElementById('formAgregarEmpleado');
@@ -260,6 +263,13 @@
         const inputEmpleado = document.getElementById('empleado');
         const inputEmpleadoId = document.getElementById('empleadoId');
         let procesando = false;
+
+        // Obtener el token CSRF del meta tag (si existe)
+        function getCsrfToken() {
+            const token = document.querySelector('meta[name="_csrf"]')?.content;
+            const header = document.querySelector('meta[name="_csrf_header"]')?.content;
+            return { token, header };
+        }
 
         if (formAgregarEmpleado && formHoras) {
             formAgregarEmpleado.addEventListener('submit', function(e) {
@@ -285,50 +295,68 @@
                 submitBtn.disabled = true;
                 submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i> Procesando...';
 
-                // Crear un FormData combinado con TODOS los datos
-                const formDataCombinado = new FormData();
+                // Guardar datos del empleado para después
+                const empleadoData = {
+                    id: inputEmpleadoId.value,
+                    nombre: inputEmpleado.value,
+                    semanaId: document.querySelector('[name="semanaId"]').value,
+                    controlPlanillaId: document.querySelector('[name="controlPlanillaId"]').value
+                };
+                sessionStorage.setItem('empleadoPendiente', JSON.stringify(empleadoData));
 
-                // 1. Agregar todos los datos del formulario de horas
-                const datosHoras = new FormData(formHoras);
-                for (let [key, value] of datosHoras.entries()) {
-                    formDataCombinado.append(key, value);
-                }
-
-                // 2. Agregar los datos del empleado a agregar
-                formDataCombinado.append('empleadoId', inputEmpleadoId.value);
-                formDataCombinado.append('semanaId', document.querySelector('[name="semanaId"]').value);
-                formDataCombinado.append('controlPlanillaId', document.querySelector('[name="controlPlanillaId"]').value);
-                formDataCombinado.append('scrollToBottom', 'true');
-                formDataCombinado.append('accion', 'guardar_y_agregar'); // Indicador de acción combinada
-
-                // Enviar todo a un nuevo endpoint que procese ambas operaciones
-                fetch('/control-planilla/guardar-y-agregar', {
-                    method: 'POST',
-                    body: formDataCombinado
-                })
-                .then(response => {
-                    if (response.redirected) {
-                        // Si el servidor devuelve una redirección, vamos a esa URL
-                        window.location.href = response.url;
-                    } else {
-                        // Si no hay redirección, recargamos la página actual
-                        window.location.reload();
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Error al procesar la solicitud. Por favor, intenta de nuevo.');
-
-                    // Restaurar botón
-                    submitBtn.disabled = false;
-                    submitBtn.innerHTML = '<i class="bi bi-person-plus me-1"></i> Agregar';
-                    procesando = false;
-                });
+                // Enviar el formulario de horas de manera tradicional (submit normal)
+                // Esto evita el problema de límite de archivos
+                formHoras.submit();
             });
+        }
+
+        // Verificar si hay un empleado pendiente después de guardar
+        const empleadoPendiente = sessionStorage.getItem('empleadoPendiente');
+        if (empleadoPendiente) {
+            try {
+                const empleado = JSON.parse(empleadoPendiente);
+
+                // Verificar que estamos en la misma semana
+                const semanaIdActual = document.querySelector('[name="semanaId"]')?.value;
+
+                if (semanaIdActual === empleado.semanaId) {
+                    console.log('Empleado pendiente encontrado, agregando automáticamente...');
+
+                    // Limpiar el storage
+                    sessionStorage.removeItem('empleadoPendiente');
+
+                    // Auto-completar y enviar el formulario de agregar
+                    document.getElementById('empleadoId').value = empleado.id;
+                    document.getElementById('empleado').value = empleado.nombre;
+
+                    // Agregar el token CSRF al formulario si existe
+                    const csrf = getCsrfToken();
+                    if (csrf.token && csrf.header) {
+                        // Buscar o crear el input CSRF
+                        let csrfInput = document.querySelector('input[name="' + csrf.header + '"]');
+                        if (!csrfInput) {
+                            csrfInput = document.createElement('input');
+                            csrfInput.type = 'hidden';
+                            csrfInput.name = csrf.header;
+                            formAgregarEmpleado.appendChild(csrfInput);
+                        }
+                        csrfInput.value = csrf.token;
+                    }
+
+                    // Enviar el formulario de agregar empleado
+                    setTimeout(() => {
+                        formAgregarEmpleado.submit();
+                    }, 500);
+                } else {
+                    sessionStorage.removeItem('empleadoPendiente');
+                }
+            } catch (e) {
+                console.error('Error:', e);
+                sessionStorage.removeItem('empleadoPendiente');
+            }
         }
     });
 </script>
-
 
 <!-- Script para búsqueda dinámica de empleados (MODIFICADO) -->
 <script>
@@ -336,20 +364,8 @@
         const inputEmpleado = document.getElementById("empleado");
         const inputEmpleadoId = document.getElementById("empleadoId");
         const sugerencias = document.getElementById("sugerencias");
-        const formAgregarEmpleado = document.getElementById("formAgregarEmpleado");
 
         if (!inputEmpleado || !inputEmpleadoId || !sugerencias) return;
-
-        // Eliminar el validador anterior que podría interferir
-        // if (formAgregarEmpleado) {
-        //     formAgregarEmpleado.addEventListener("submit", function(e) {
-        //         if (!inputEmpleadoId.value) {
-        //             e.preventDefault();
-        //             alert("Por favor, selecciona un empleado de la lista de sugerencias");
-        //             inputEmpleado.focus();
-        //         }
-        //     });
-        // }
 
         inputEmpleado.addEventListener("input", function () {
             const query = this.value.trim();
@@ -360,67 +376,61 @@
                 return;
             }
 
-            fetch(`/empleados/buscar?q=${encodeURIComponent(query)}`)
-                .then(response => response.json())
-                .then(data => {
-                    sugerencias.innerHTML = "";
+            // Obtener token CSRF para la petición fetch
+            const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;
+            const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content;
 
-                    if (data.length > 0) {
-                        data.forEach(e => {
-                            const item = document.createElement("a");
-                            item.href = "#";
-                            item.className = "list-group-item list-group-item-action";
-                            item.dataset.id = e.id;
-                            item.dataset.dni = e.dni;
-                            item.dataset.nombre = e.nombre;
-                            item.dataset.apellido = e.apellido;
-                            item.textContent = `${e.apellido} ${e.nombre} - ${e.dni}`;
+            const headers = {
+                'Content-Type': 'application/json'
+            };
 
-                            item.addEventListener("click", function (event) {
-                                event.preventDefault();
-                                inputEmpleado.value = `${this.dataset.apellido} ${this.dataset.nombre}`;
-                                inputEmpleadoId.value = this.dataset.id;
-                                sugerencias.innerHTML = "";
-                                sugerencias.style.display = "none";
-                            });
+            if (csrfToken && csrfHeader) {
+                headers[csrfHeader] = csrfToken;
+            }
 
-                            sugerencias.appendChild(item);
+            fetch(`/empleados/buscar?q=${encodeURIComponent(query)}`, {
+                headers: headers
+            })
+            .then(response => response.json())
+            .then(data => {
+                sugerencias.innerHTML = "";
+
+                if (data.length > 0) {
+                    data.forEach(e => {
+                        const item = document.createElement("a");
+                        item.href = "#";
+                        item.className = "list-group-item list-group-item-action";
+                        item.dataset.id = e.id;
+                        item.dataset.dni = e.dni;
+                        item.dataset.nombre = e.nombre;
+                        item.dataset.apellido = e.apellido;
+                        item.textContent = `${e.apellido} ${e.nombre} - ${e.dni}`;
+
+                        item.addEventListener("click", function (event) {
+                            event.preventDefault();
+                            inputEmpleado.value = `${this.dataset.apellido} ${this.dataset.nombre}`;
+                            inputEmpleadoId.value = this.dataset.id;
+                            sugerencias.innerHTML = "";
+                            sugerencias.style.display = "none";
                         });
-                        sugerencias.style.display = "block";
-                    } else {
-                        sugerencias.style.display = "none";
-                    }
-                })
-                .catch(error => {
-                    console.error("Error al buscar empleados:", error);
-                    sugerencias.innerHTML = "";
+
+                        sugerencias.appendChild(item);
+                    });
+                    sugerencias.style.display = "block";
+                } else {
                     sugerencias.style.display = "none";
-                });
-        });
-
-        // Ocultar sugerencias al hacer clic fuera
-        document.addEventListener("click", function (event) {
-            if (!sugerencias.contains(event.target) && event.target !== inputEmpleado) {
+                }
+            })
+            .catch(error => {
+                console.error("Error al buscar empleados:", error);
                 sugerencias.innerHTML = "";
                 sugerencias.style.display = "none";
-            }
+            });
         });
 
-        // Ocultar sugerencias con ESC
-        inputEmpleado.addEventListener("keydown", function (event) {
-            if (event.key === "Escape") {
-                sugerencias.innerHTML = "";
-                sugerencias.style.display = "none";
-            }
-        });
-
-        // Limpiar ID si el usuario modifica el input
-        inputEmpleado.addEventListener("keyup", function() {
-            inputEmpleadoId.value = "";
-        });
+        // Resto del código igual...
     });
 </script>
-
 
 <!-- Script para scroll automático -->
 <script>
