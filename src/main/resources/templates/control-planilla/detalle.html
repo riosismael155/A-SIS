@@ -53,7 +53,7 @@
                 </a>
             </div>
 
-            <!-- PESTAÑAS PRINCIPALES - Estilo original (borde verde, texto verde, sin fondo) -->
+            <!-- PESTAÑAS PRINCIPALES -->
             <ul class="nav nav-tabs mb-4" id="planillaTabs" role="tablist">
                 <li class="nav-item" role="presentation">
                     <button class="nav-link active" onclick="openTab(event, 'semana-tab')">
@@ -72,8 +72,9 @@
             <div id="semana-tab" class="tab-pane active">
                 <h5 class="mb-3 text-h">Empleados de esta semana</h5>
 
-                <form th:action="@{/control-planilla/guardar}" method="post">
+                <form id="formHoras" th:action="@{/control-planilla/guardar}" method="post">
                     <input type="hidden" name="semanaId" th:value="${semana.id}"/>
+                    <input type="hidden" name="scrollToBottom" value="true"/>
 
                     <div class="table-responsive">
                         <table class="table table-bordered table-hover table-excel">
@@ -94,7 +95,7 @@
                             </tr>
                             </thead>
 
-                            <tbody>
+                            <tbody id="empleadosTableBody">
                             <tr th:each="se, i : ${empleadosSemana}">
                                 <td th:text="${se.empleado.apellido + ', ' + se.empleado.nombre}"></td>
 
@@ -157,10 +158,11 @@
                 <hr class="my-4">
 
                 <!-- Formulario para agregar empleado con búsqueda dinámica -->
-                <h5 class="mb-3 text-h">Agregar empleado a la semana</h5>
-                <form th:action="@{/semana-empleado/agregar}" method="post" class="row g-3 align-items-center">
+                <h5 id="agregarEmpleado" class="mb-3 text-h">Agregar empleado a la semana</h5>
+                <form id="formAgregarEmpleado" th:action="@{/semana-empleado/agregar}" method="post" class="row g-3 align-items-center">
                     <input type="hidden" name="semanaId" th:value="${semana.id}">
                     <input type="hidden" name="controlPlanillaId" th:value="${control.id}">
+                    <input type="hidden" name="scrollToBottom" value="true"/>
                     <input type="hidden" id="empleadoId" name="empleadoId" value="">
 
                     <div class="col-md-8">
@@ -169,7 +171,8 @@
                                    id="empleado"
                                    class="form-control"
                                    placeholder="Buscar empleado por nombre o apellido..."
-                                   autocomplete="off">
+                                   autocomplete="off"
+                                   required>
 
                             <!-- Contenedor de sugerencias -->
                             <div id="sugerencias"
@@ -184,11 +187,10 @@
                             <i class="bi bi-person-plus me-1"></i> Agregar
                         </button>
                     </div>
-                </form>            </div>
+                </form>
+            </div>
 
-
-
-            <!-- CONTENIDO DE PESTAÑA 3: OBSERVACIONES -->
+            <!-- CONTENIDO DE PESTAÑA 2: OBSERVACIONES -->
             <div id="observaciones-tab" class="tab-pane">
                 <h5 class="mb-3 text-h">Observaciones del Período</h5>
 
@@ -196,16 +198,16 @@
                     <ul class="mb-0">
                         <li><strong>Período:</strong>
                             <span th:text="${#temporals.format(control.desde, 'dd/MM/yyyy')}"></span>
-
+                            →
                             <span th:text="${#temporals.format(control.hasta, 'dd/MM/yyyy')}"></span>
                         </li>
-
                     </ul>
                 </div>
 
                 <!-- Formulario para editar observaciones -->
                 <form th:action="@{/control-planilla/{id}/observaciones(id=${control.id})}" method="post">
                     <input type="hidden" name="semanaId" th:value="${semana.id}">
+                    <input type="hidden" name="scrollToBottom" value="true"/>
 
                     <div class="mb-3">
                         <label for="observaciones" class="form-label fw-bold">Observaciones:</label>
@@ -247,60 +249,107 @@
         // Mostrar la pestaña actual y marcar el botón como activo
         document.getElementById(tabName).classList.add("active");
         evt.currentTarget.classList.add("active");
-
-        // Si cambiamos a la pestaña de justificaciones, mostrar por defecto la primera sub-pestaña
-        if (tabName === 'justificaciones-tab') {
-            // Activar primera sub-pestaña
-            var firstSubTab = document.querySelector('#justificaciones-tab .sub-tab-pane');
-            if (firstSubTab) {
-                // Desactivar todas las sub-pestañas
-                var subTabPanes = document.querySelectorAll('#justificaciones-tab .sub-tab-pane');
-                for (var i = 0; i < subTabPanes.length; i++) {
-                    subTabPanes[i].classList.remove('active');
-                }
-
-                // Desactivar todos los botones de sub-pestañas
-                var subTabButtons = document.querySelectorAll('#justificacionesSubTabs .nav-link');
-                for (var i = 0; i < subTabButtons.length; i++) {
-                    subTabButtons[i].classList.remove('active');
-                }
-
-                // Activar primera sub-pestaña
-                firstSubTab.classList.add('active');
-                if (subTabButtons.length > 0) {
-                    subTabButtons[0].classList.add('active');
-                }
-            }
-        }
-    }
-
-    function openSubTab(evt, subTabName, parentTabName) {
-        // Ocultar todo el contenido de sub-pestañas dentro del parentTab
-        var subTabContents = document.querySelectorAll('#' + parentTabName + ' .sub-tab-pane');
-        for (var i = 0; i < subTabContents.length; i++) {
-            subTabContents[i].classList.remove("active");
-        }
-
-        // Quitar la clase active de todos los botones de sub-pestañas
-        var subTabButtons = document.querySelectorAll('#justificacionesSubTabs .nav-link');
-        for (var i = 0; i < subTabButtons.length; i++) {
-            subTabButtons[i].classList.remove("active");
-        }
-
-        // Mostrar la sub-pestaña actual y marcar el botón como activo
-        document.getElementById(subTabName).classList.add("active");
-        evt.currentTarget.classList.add("active");
     }
 </script>
 
-<!-- Script para búsqueda dinámica de empleados -->
+<!-- Script para guardar y agregar en una sola operación -->
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const formAgregarEmpleado = document.getElementById('formAgregarEmpleado');
+        const formHoras = document.getElementById('formHoras');
+        const inputEmpleado = document.getElementById('empleado');
+        const inputEmpleadoId = document.getElementById('empleadoId');
+        let procesando = false;
+
+        if (formAgregarEmpleado && formHoras) {
+            formAgregarEmpleado.addEventListener('submit', function(e) {
+                // Validar empleado seleccionado
+                if (!inputEmpleadoId.value) {
+                    e.preventDefault();
+                    alert('Por favor, selecciona un empleado de la lista de sugerencias');
+                    inputEmpleado.focus();
+                    return;
+                }
+
+                // Evitar múltiples envíos
+                if (procesando) {
+                    e.preventDefault();
+                    return;
+                }
+
+                e.preventDefault();
+                procesando = true;
+
+                // Deshabilitar botón
+                const submitBtn = formAgregarEmpleado.querySelector('button[type="submit"]');
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i> Procesando...';
+
+                // Crear un FormData combinado con TODOS los datos
+                const formDataCombinado = new FormData();
+
+                // 1. Agregar todos los datos del formulario de horas
+                const datosHoras = new FormData(formHoras);
+                for (let [key, value] of datosHoras.entries()) {
+                    formDataCombinado.append(key, value);
+                }
+
+                // 2. Agregar los datos del empleado a agregar
+                formDataCombinado.append('empleadoId', inputEmpleadoId.value);
+                formDataCombinado.append('semanaId', document.querySelector('[name="semanaId"]').value);
+                formDataCombinado.append('controlPlanillaId', document.querySelector('[name="controlPlanillaId"]').value);
+                formDataCombinado.append('scrollToBottom', 'true');
+                formDataCombinado.append('accion', 'guardar_y_agregar'); // Indicador de acción combinada
+
+                // Enviar todo a un nuevo endpoint que procese ambas operaciones
+                fetch('/control-planilla/guardar-y-agregar', {
+                    method: 'POST',
+                    body: formDataCombinado
+                })
+                .then(response => {
+                    if (response.redirected) {
+                        // Si el servidor devuelve una redirección, vamos a esa URL
+                        window.location.href = response.url;
+                    } else {
+                        // Si no hay redirección, recargamos la página actual
+                        window.location.reload();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error al procesar la solicitud. Por favor, intenta de nuevo.');
+
+                    // Restaurar botón
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="bi bi-person-plus me-1"></i> Agregar';
+                    procesando = false;
+                });
+            });
+        }
+    });
+</script>
+
+
+<!-- Script para búsqueda dinámica de empleados (MODIFICADO) -->
 <script>
     document.addEventListener("DOMContentLoaded", function () {
         const inputEmpleado = document.getElementById("empleado");
         const inputEmpleadoId = document.getElementById("empleadoId");
         const sugerencias = document.getElementById("sugerencias");
+        const formAgregarEmpleado = document.getElementById("formAgregarEmpleado");
 
         if (!inputEmpleado || !inputEmpleadoId || !sugerencias) return;
+
+        // Eliminar el validador anterior que podría interferir
+        // if (formAgregarEmpleado) {
+        //     formAgregarEmpleado.addEventListener("submit", function(e) {
+        //         if (!inputEmpleadoId.value) {
+        //             e.preventDefault();
+        //             alert("Por favor, selecciona un empleado de la lista de sugerencias");
+        //             inputEmpleado.focus();
+        //         }
+        //     });
+        // }
 
         inputEmpleado.addEventListener("input", function () {
             const query = this.value.trim();
@@ -372,7 +421,102 @@
     });
 </script>
 
-<!-- Estilos adicionales - CORREGIDOS para coincidir con el diseño original -->
+
+<!-- Script para scroll automático -->
+<script>
+    (function() {
+        // Función para hacer scroll al final de la página
+        function scrollToBottom() {
+            console.log("Intentando hacer scroll..."); // Para debug
+
+            // Intentar varias veces con pequeños retrasos para asegurar que el DOM esté listo
+            setTimeout(function() {
+                window.scrollTo({
+                    top: document.body.scrollHeight,
+                    behavior: 'smooth'
+                });
+                console.log("Scroll ejecutado"); // Para debug
+            }, 300);
+
+            // Segundo intento por si acaso
+            setTimeout(function() {
+                window.scrollTo({
+                    top: document.body.scrollHeight,
+                    behavior: 'smooth'
+                });
+            }, 600);
+        }
+
+        // Función para verificar y procesar parámetros de URL
+        function checkUrlForScroll() {
+            console.log("Verificando URL para scroll..."); // Para debug
+            console.log("URL actual:", window.location.href); // Para debug
+
+            // Obtener parámetros de la URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const scrollToBottom = urlParams.get('scrollToBottom');
+
+            console.log("scrollToBottom param:", scrollToBottom); // Para debug
+
+            // Scroll por parámetro scrollToBottom
+            if (scrollToBottom === 'true') {
+                console.log("¡ScrollToBottom detectado! Ejecutando scroll..."); // Para debug
+                scrollToBottom();
+
+                // Limpiar el parámetro de la URL sin recargar la página
+                const url = new URL(window.location.href);
+                url.searchParams.delete('scrollToBottom');
+                window.history.replaceState({}, document.title, url.toString());
+            }
+        }
+
+        // Ejecutar cuando el DOM esté completamente cargado
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', checkUrlForScroll);
+        } else {
+            // DOM ya está cargado
+            checkUrlForScroll();
+        }
+
+        // También ejecutar después de que todo esté cargado (imágenes, etc)
+        window.addEventListener('load', function() {
+            // Verificar de nuevo por si acaso
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('scrollToBottom') === 'true') {
+                console.log("Load event: scrollToBottom detectado"); // Para debug
+                scrollToBottom();
+            }
+        });
+
+        // Scroll por hash (para #agregarEmpleado)
+        if (window.location.hash === '#agregarEmpleado') {
+            setTimeout(function() {
+                const elemento = document.getElementById('agregarEmpleado');
+                if (elemento) {
+                    elemento.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            }, 300);
+        }
+
+        // Resaltar el último empleado (opcional, para mejor UX)
+        setTimeout(function() {
+            const filas = document.querySelectorAll('#empleadosTableBody tr');
+            if (filas.length > 0) {
+                const ultimaFila = filas[filas.length - 1];
+                ultimaFila.style.backgroundColor = '#d4edda';
+                ultimaFila.style.transition = 'background-color 2s';
+                setTimeout(() => {
+                    ultimaFila.style.backgroundColor = '';
+                }, 2000);
+            }
+        }, 500);
+    })();
+</script>
+
+<!-- Estilos adicionales -->
 <style>
     .separador {
         border-left: 2px solid #dee2e6 !important;
@@ -390,14 +534,8 @@
     .tab-pane.active {
         display: block;
     }
-    .sub-tab-pane {
-        display: none;
-    }
-    .sub-tab-pane.active {
-        display: block;
-    }
 
-    /* ESTILO CORREGIDO - Pestañas con borde verde, texto verde y sin fondo */
+    /* Estilo para pestañas */
     .nav-tabs .nav-link {
         cursor: pointer;
         color: #495057;
@@ -408,9 +546,9 @@
     }
 
     .nav-tabs .nav-link.active {
-
+        color: #28a745 !important;
+        border-color: #28a745 #28a745 #fff !important;
         background: transparent !important;
-
     }
 
     .nav-tabs .nav-link:hover:not(.active) {
@@ -418,18 +556,21 @@
         isolation: isolate;
     }
 
-    /* Mismo estilo para sub-pestañas */
-    #justificacionesSubTabs .nav-link.active {
-        color: #28a745 !important;
-        border-color: #28a745 #28a745 #fff !important;
-        background: transparent !important;
-    }
-
     .list-group-item {
         cursor: pointer;
     }
     .list-group-item:hover {
         background-color: #f8f9fa;
+    }
+
+    /* Animación para resaltar fila */
+    #empleadosTableBody tr:last-child {
+        transition: background-color 2s;
+    }
+
+    @keyframes highlight {
+        0% { background-color: #d4edda; }
+        100% { background-color: transparent; }
     }
 </style>
 

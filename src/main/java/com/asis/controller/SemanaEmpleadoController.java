@@ -37,6 +37,7 @@ public class SemanaEmpleadoController {
     public String agregarEmpleadoASemana(
             @RequestParam("semanaId") Long semanaId,
             @RequestParam("empleadoId") Long empleadoId,
+            @RequestParam(value = "scrollToBottom", required = false) Boolean scrollToBottom,
             RedirectAttributes redirectAttributes) {
 
         try {
@@ -48,16 +49,17 @@ public class SemanaEmpleadoController {
             redirectAttributes.addFlashAttribute("tipoMensaje", "error");
         }
 
-        // Obtener la semana y su control de planilla asociado
         Semana semana = semanaService.findById(semanaId);
         ControlPlanilla controlPlanilla = semana.getControlPlanilla();
 
-        return "redirect:/control-planilla/" + controlPlanilla.getId() + "?semanaId=" + semanaId;
+        // Agregar atributo para scroll si viene en la petición
+        if (scrollToBottom != null && scrollToBottom) {
+            redirectAttributes.addAttribute("scrollToBottom", true);
+        }
+
+        return "redirect:/control-planilla/"
+                + controlPlanilla.getId()
+                + "?semanaId=" + semanaId;
     }
-
-
-
-
-
 
 }

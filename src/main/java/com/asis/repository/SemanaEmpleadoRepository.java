@@ -14,7 +14,7 @@ public interface SemanaEmpleadoRepository extends JpaRepository<SemanaEmpleado, 
 
     boolean existsBySemanaIdAndEmpleadoId(Long semanaId, Long empleadoId);
 
-    List<SemanaEmpleado> findBySemanaId(Long semanaId);
+    List<SemanaEmpleado> findBySemanaIdOrderByIdAsc(Long semanaId);
 
     @Query("SELECT se FROM SemanaEmpleado se " +
             "JOIN FETCH se.empleado e " +  // Para cargar el empleado

@@ -70,7 +70,7 @@ public class SemanaEmpleadoService {
 
 
     public List<SemanaEmpleado> obtenerEmpleadosDeSemana(Semana semana) {
-        return repo.findBySemanaId(semana.getId());
+        return repo.findBySemanaIdOrderByIdAsc(semana.getId());
     }
 
     public Optional<SemanaEmpleado> findById(Long id) {
@@ -78,7 +78,7 @@ public class SemanaEmpleadoService {
     }
 
     public List<SemanaEmpleado> findBySemana(Semana semana) {
-        return repo.findBySemanaId(semana.getId());
+        return repo.findBySemanaIdOrderByIdAsc(semana.getId());
     }
     public List<SemanaEmpleado> findAllByPeriodo(LocalDate desde, LocalDate hasta) {
         return repo.findAllByPeriodo(desde, hasta);

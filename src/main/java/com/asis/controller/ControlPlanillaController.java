@@ -72,6 +72,7 @@ public class ControlPlanillaController {
     public String verPlanilla(
             @PathVariable("id") Long id,
             @RequestParam(value = "semanaId", required = false) Long semanaId,
+            @RequestParam(value = "scrollToBottom", required = false) Boolean scrollToBottom,
             Model model
     ) {
         ControlPlanilla cp = controlService.findById(id).orElseThrow();
@@ -85,15 +86,12 @@ public class ControlPlanillaController {
         model.addAttribute("semanaAnterior", semanaService.getAnterior(cp, semana));
         model.addAttribute("semanaSiguiente", semanaService.getSiguiente(cp, semana));
 
-        // Empleados de la semana actual - ORDENADOS POR APELLIDO
+        // Empleados de la semana actual - ORDENADOS POR ID (más antiguos primero)
         List<SemanaEmpleado> empleadosSemana = semanaEmpleadoService.findBySemana(semana);
 
-        // Ordenar por apellido del empleado
+        // Ordenar por ID (asumiendo que IDs más grandes = más nuevos)
         if (empleadosSemana != null && !empleadosSemana.isEmpty()) {
-            empleadosSemana.sort(Comparator.comparing(
-                    se -> se.getEmpleado() != null ? se.getEmpleado().getApellido() : "",
-                    String.CASE_INSENSITIVE_ORDER
-            ));
+            empleadosSemana.sort(Comparator.comparing(SemanaEmpleado::getId));
         }
 
         model.addAttribute("empleadosSemana", empleadosSemana);
@@ -109,6 +107,9 @@ public class ControlPlanillaController {
 
         // Empleados disponibles para agregar
         model.addAttribute("empleados", empleadoService.findAll());
+
+        // Agregar flag para scroll automático
+        model.addAttribute("scrollToBottom", scrollToBottom != null ? scrollToBottom : false);
 
         return "control-planilla/detalle";
     }
@@ -130,11 +131,58 @@ public class ControlPlanillaController {
     @PostMapping("/guardar")
     public String guardarCambios(
             @ModelAttribute SemanaEmpleadoForm form,
-            @RequestParam("semanaId") Long semanaId
+            @RequestParam("semanaId") Long semanaId,
+            @RequestParam(value = "scrollToBottom", required = false) Boolean scrollToBottom,
+            RedirectAttributes redirectAttributes
     ) {
-        semanaEmpleadoService.guardarCambios(form.getItems());
+        try {
+            semanaEmpleadoService.guardarCambios(form.getItems());
+            redirectAttributes.addFlashAttribute("mensaje", "Cambios guardados correctamente");
+            redirectAttributes.addFlashAttribute("tipoMensaje", "success");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("mensaje", "Error al guardar cambios: " + e.getMessage());
+            redirectAttributes.addFlashAttribute("tipoMensaje", "error");
+        }
 
         Semana semana = semanaService.findById(semanaId);
+
+        // Agregar atributo para scroll si viene en la petición
+        if (scrollToBottom != null && scrollToBottom) {
+            redirectAttributes.addAttribute("scrollToBottom", true);
+        }
+
+        return "redirect:/control-planilla/"
+                + semana.getControlPlanilla().getId()
+                + "?semanaId=" + semanaId;
+    }
+
+    @PostMapping("/guardar-y-agregar")
+    public String guardarYAgregar(
+            @ModelAttribute SemanaEmpleadoForm form,
+            @RequestParam("semanaId") Long semanaId,
+            @RequestParam("empleadoId") Long empleadoId,
+            @RequestParam(value = "scrollToBottom", required = false) Boolean scrollToBottom,
+            RedirectAttributes redirectAttributes) {
+
+        try {
+            // Primero guardar los cambios de horas
+            semanaEmpleadoService.guardarCambios(form.getItems());
+
+            // Luego agregar el nuevo empleado
+            semanaEmpleadoService.agregarEmpleadoASemana(semanaId, empleadoId);
+
+            redirectAttributes.addFlashAttribute("mensaje", "Cambios guardados y empleado agregado correctamente");
+            redirectAttributes.addFlashAttribute("tipoMensaje", "success");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("mensaje", "Error: " + e.getMessage());
+            redirectAttributes.addFlashAttribute("tipoMensaje", "error");
+        }
+
+        Semana semana = semanaService.findById(semanaId);
+
+        if (scrollToBottom != null && scrollToBottom) {
+            redirectAttributes.addAttribute("scrollToBottom", true);
+        }
 
         return "redirect:/control-planilla/"
                 + semana.getControlPlanilla().getId()
@@ -147,6 +195,7 @@ public class ControlPlanillaController {
             @PathVariable("id") Long id,
             @RequestParam("semanaId") Long semanaId,
             @RequestParam("observaciones") String observaciones,
+            @RequestParam(value = "scrollToBottom", required = false) Boolean scrollToBottom,
             RedirectAttributes redirectAttributes) {
 
         try {
@@ -156,6 +205,11 @@ public class ControlPlanillaController {
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("mensaje", "Error al guardar observaciones");
             redirectAttributes.addFlashAttribute("tipoMensaje", "error");
+        }
+
+        // Agregar atributo para scroll si viene en la petición
+        if (scrollToBottom != null && scrollToBottom) {
+            redirectAttributes.addAttribute("scrollToBottom", true);
         }
 
         return "redirect:/control-planilla/" + id + "?semanaId=" + semanaId;
