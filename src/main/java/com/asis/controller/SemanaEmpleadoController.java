@@ -62,4 +62,38 @@ public class SemanaEmpleadoController {
                 + "?semanaId=" + semanaId;
     }
 
+    @PostMapping("/agregar-con-guardado")
+    public String agregarEmpleadoConGuardado(
+            @ModelAttribute SemanaEmpleadoForm form,
+            @RequestParam("semanaId") Long semanaId,
+            @RequestParam("empleadoId") Long empleadoId,
+            @RequestParam(value = "scrollToBottom", required = false) Boolean scrollToBottom,
+            RedirectAttributes redirectAttributes
+    ) {
+        try {
+            // Primero guardar los cambios de horas
+            semanaEmpleadoService.guardarCambios(form.getItems());
+
+            // Luego agregar el nuevo empleado
+            semanaEmpleadoService.agregarEmpleadoASemana(semanaId, empleadoId);
+
+            redirectAttributes.addFlashAttribute("mensaje", "Cambios guardados y empleado agregado correctamente");
+            redirectAttributes.addFlashAttribute("tipoMensaje", "success");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("mensaje", "Error: " + e.getMessage());
+            redirectAttributes.addFlashAttribute("tipoMensaje", "error");
+        }
+
+        Semana semana = semanaService.findById(semanaId);
+
+        if (scrollToBottom != null && scrollToBottom) {
+            redirectAttributes.addAttribute("scrollToBottom", true);
+        }
+
+        return "redirect:/control-planilla/"
+                + semana.getControlPlanilla().getId()
+                + "?semanaId=" + semanaId;
+    }
+
+
 }

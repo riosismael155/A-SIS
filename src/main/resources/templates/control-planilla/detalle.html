@@ -1,205 +1,33 @@
-<!DOCTYPE html>
-<html lang="es" xmlns:th="http://www.thymeleaf.org">
-<head th:replace="fragments/header :: head('Detalle Control Planilla')">
-    <!-- En el header de tu página, agrega estos meta tags para CSRF -->
-    <meta name="_csrf" th:content="${_csrf.token}"/>
-    <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
-</head>
-<body>
-<div th:replace="fragments/header :: body"></div>
+    <!DOCTYPE html>
+    <html lang="es" xmlns:th="http://www.thymeleaf.org">
+    <head th:replace="fragments/header :: head('Detalle Control Planilla')">
+        <!-- En el header de tu página, agrega estos meta tags para CSRF -->
+        <meta name="_csrf" th:content="${_csrf.token}"/>
+        <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
+    </head>
+    <body>
+    <div th:replace="fragments/header :: body"></div>
 
-<main class="flex-fill">
-    <div class="container">
-        <div class="bloque-elevado px-5 py-4 mt-container">
+    <main class="flex-fill">
+        <div class="container">
+            <div class="bloque-elevado px-5 py-4 mt-container">
 
-            <!-- Título con ícono y botón volver -->
-            <div class="d-flex align-items-center mb-4">
-                <a th:href="@{/control-planilla}"
-                   class="me-3 color-iconos d-flex align-items-center"
-                   title="Volver al listado">
-                    <i class="bi bi-arrow-left-circle me-1 fs-5"></i>
-                </a>
-                <i class="bi bi-file-spreadsheet-fill fs-5 me-2 color-iconos"></i>
-                <h4 class="mb-0 text-h" th:text="${control.nombre}">Control</h4>
-            </div>
+                <!-- Título con ícono y botón volver -->
+                <div class="d-flex align-items-center mb-4">
+                    <a th:href="@{/control-planilla}"
+                       class="me-3 color-iconos d-flex align-items-center"
+                       title="Volver al listado">
+                        <i class="bi bi-arrow-left-circle me-1 fs-5"></i>
+                    </a>
+                    <i class="bi bi-file-spreadsheet-fill fs-5 me-2 color-iconos"></i>
+                    <h4 class="mb-0 text-h" th:text="${control.nombre}">Control</h4>
+                </div>
 
-            <!-- Información del período -->
-            <div class="info-box mb-4">
-                <ul class="mb-0">
-                    <li>
-                        <strong>Período:</strong>
-                        <span th:text="${#temporals.format(control.desde, 'dd/MM/yyyy')}"></span>
-                        →
-                        <span th:text="${#temporals.format(control.hasta, 'dd/MM/yyyy')}"></span>
-                    </li>
-                </ul>
-            </div>
-
-            <!-- Navegación de semanas -->
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <a th:if="${semanaAnterior != null}"
-                   th:href="@{/control-planilla/{id}(id=${control.id}, semanaId=${semanaAnterior.id})}"
-                   class="btn-action-outline">
-                    <i class="bi bi-arrow-left me-1"></i> Semana anterior
-                </a>
-
-                <strong class="fs-5">
-                    <span th:text="${#temporals.format(semana.desde, 'dd/MM/yyyy')}"></span>
-                    →
-                    <span th:text="${#temporals.format(semana.hasta, 'dd/MM/yyyy')}"></span>
-                </strong>
-
-                <a th:if="${semanaSiguiente != null}"
-                   th:href="@{/control-planilla/{id}(id=${control.id}, semanaId=${semanaSiguiente.id})}"
-                   class="btn-action-outline">
-                    Semana siguiente <i class="bi bi-arrow-right ms-1"></i>
-                </a>
-            </div>
-
-            <!-- PESTAÑAS PRINCIPALES -->
-            <ul class="nav nav-tabs mb-4" id="planillaTabs" role="tablist">
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link active" onclick="openTab(event, 'semana-tab')">
-                        <i class="bi bi-calendar-week me-1"></i> Semana Actual
-                    </button>
-                </li>
-
-                <li class="nav-item">
-                    <button class="nav-link" onclick="openTab(event, 'observaciones-tab')">
-                        <i class="bi bi-chat-dots me-1"></i> Observaciones
-                    </button>
-                </li>
-            </ul>
-
-            <!-- CONTENIDO DE PESTAÑA 1: SEMANA ACTUAL -->
-            <div id="semana-tab" class="tab-pane active">
-                <h5 class="mb-3 text-h">Empleados de esta semana</h5>
-
-                <form id="formHoras" th:action="@{/control-planilla/guardar}" method="post">
-                    <input type="hidden" name="semanaId" th:value="${semana.id}"/>
-                    <input type="hidden" name="scrollToBottom" value="true"/>
-
-                    <div class="table-responsive">
-                        <table class="table table-bordered table-hover table-excel">
-                            <thead class="table-dark">
-                            <tr>
-                                <th rowspan="2">Empleado</th>
-                                <th colspan="2" class="separador">Horas 50%</th>
-                                <th colspan="2">Horas 100%</th>
-                                <th colspan="2">Guardias</th>
-                            </tr>
-                            <tr>
-                                <th class="separador">Semana</th>
-                                <th class="mensual">Total Mensual</th>
-                                <th>Semana</th>
-                                <th class="mensual">Total Mensual</th>
-                                <th>Semana</th>
-                                <th class="mensual">Total Mensual</th>
-                            </tr>
-                            </thead>
-
-                            <tbody id="empleadosTableBody">
-                            <tr th:each="se, i : ${empleadosSemana}">
-                                <td th:text="${se.empleado.apellido + ', ' + se.empleado.nombre}"></td>
-
-                                <input type="hidden"
-                                       th:name="'items[' + ${i.index} + '].id'"
-                                       th:value="${se.id}"/>
-
-                                <td class="separador">
-                                    <input type="number"
-                                           class="form-control form-control-sm"
-                                           th:name="'items[' + ${i.index} + '].totalHorasExtra'"
-                                           th:value="${se.totalHorasExtra}"
-                                           min="0"
-                                           step="0.5"/>
-                                </td>
-
-                                <td class="mensual"
-                                    th:text="${totalesMensualesPorEmpleado[se.empleado.id]?.totalHorasExtra != null ?
-                                                  #numbers.formatDecimal(totalesMensualesPorEmpleado[se.empleado.id].totalHorasExtra, 1, 2) : '0.00'}">
-                                </td>
-
-                                <td>
-                                    <input type="number"
-                                           class="form-control form-control-sm"
-                                           th:name="'items[' + ${i.index} + '].totalFindeFeriado'"
-                                           th:value="${se.totalFindeFeriado}"
-                                           min="0"
-                                           step="0.5"/>
-                                </td>
-
-                                <td class="mensual"
-                                    th:text="${totalesMensualesPorEmpleado[se.empleado.id]?.totalFindeFeriado != null ?
-                                                  #numbers.formatDecimal(totalesMensualesPorEmpleado[se.empleado.id].totalFindeFeriado, 1, 2) : '0.00'}">
-                                </td>
-
-                                <td>
-                                    <input type="number"
-                                           class="form-control form-control-sm"
-                                           th:name="'items[' + ${i.index} + '].totalGuardias'"
-                                           th:value="${se.totalGuardias}"
-                                           min="0"/>
-                                </td>
-
-                                <td class="mensual"
-                                    th:text="${totalesMensualesPorEmpleado[se.empleado.id]?.totalGuardias != null ?
-                                                  totalesMensualesPorEmpleado[se.empleado.id].totalGuardias : 0}">
-                                </td>
-                            </tr>
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div class="mt-3">
-                        <button type="submit" class="btn-action">
-                            <i class="bi bi-save me-1"></i> Guardar cambios
-                        </button>
-                    </div>
-                </form>
-
-                <hr class="my-4">
-
-                <!-- Formulario para agregar empleado con búsqueda dinámica -->
-                <h5 id="agregarEmpleado" class="mb-3 text-h">Agregar empleado a la semana</h5>
-                <form id="formAgregarEmpleado" th:action="@{/semana-empleado/agregar}" method="post" class="row g-3 align-items-center">
-                    <input type="hidden" name="semanaId" th:value="${semana.id}">
-                    <input type="hidden" name="controlPlanillaId" th:value="${control.id}">
-                    <input type="hidden" name="scrollToBottom" value="true"/>
-                    <input type="hidden" id="empleadoId" name="empleadoId" value="">
-
-                    <div class="col-md-8">
-                        <div class="position-relative">
-                            <input type="text"
-                                   id="empleado"
-                                   class="form-control"
-                                   placeholder="Buscar empleado por nombre o apellido..."
-                                   autocomplete="off"
-                                   required>
-
-                            <!-- Contenedor de sugerencias -->
-                            <div id="sugerencias"
-                                 class="list-group position-absolute w-100 z-3"
-                                 style="top: 100%; max-height: 300px; overflow-y: auto; display: none; z-index: 1000;">
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-md-auto">
-                        <button type="submit" class="btn-action">
-                            <i class="bi bi-person-plus me-1"></i> Agregar
-                        </button>
-                    </div>
-                </form>
-            </div>
-
-            <!-- CONTENIDO DE PESTAÑA 2: OBSERVACIONES -->
-            <div id="observaciones-tab" class="tab-pane">
-                <h5 class="mb-3 text-h">Observaciones del Período</h5>
-
+                <!-- Información del período -->
                 <div class="info-box mb-4">
                     <ul class="mb-0">
-                        <li><strong>Período:</strong>
+                        <li>
+                            <strong>Período:</strong>
                             <span th:text="${#temporals.format(control.desde, 'dd/MM/yyyy')}"></span>
                             →
                             <span th:text="${#temporals.format(control.hasta, 'dd/MM/yyyy')}"></span>
@@ -207,383 +35,505 @@
                     </ul>
                 </div>
 
-                <!-- Formulario para editar observaciones -->
-                <form th:action="@{/control-planilla/{id}/observaciones(id=${control.id})}" method="post">
-                    <input type="hidden" name="semanaId" th:value="${semana.id}">
-                    <input type="hidden" name="scrollToBottom" value="true"/>
+                <!-- Navegación de semanas -->
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <a th:if="${semanaAnterior != null}"
+                       th:href="@{/control-planilla/{id}(id=${control.id}, semanaId=${semanaAnterior.id})}"
+                       class="btn-action-outline">
+                        <i class="bi bi-arrow-left me-1"></i> Semana anterior
+                    </a>
 
-                    <div class="mb-3">
-                        <label for="observaciones" class="form-label fw-bold">Observaciones:</label>
-                        <textarea id="observaciones"
-                                  name="observaciones"
-                                  class="form-control"
-                                  rows="8"
-                                  placeholder="Escribe aquí las observaciones para este control de planilla..."
-                                  th:text="${control.observaciones}"></textarea>
-                    </div>
+                    <strong class="fs-5">
+                        <span th:text="${#temporals.format(semana.desde, 'dd/MM/yyyy')}"></span>
+                        →
+                        <span th:text="${#temporals.format(semana.hasta, 'dd/MM/yyyy')}"></span>
+                    </strong>
 
-                    <div class="mt-3">
-                        <button type="submit" class="btn-action">
-                            <i class="bi bi-save me-1"></i> Guardar observaciones
+                    <a th:if="${semanaSiguiente != null}"
+                       th:href="@{/control-planilla/{id}(id=${control.id}, semanaId=${semanaSiguiente.id})}"
+                       class="btn-action-outline">
+                        Semana siguiente <i class="bi bi-arrow-right ms-1"></i>
+                    </a>
+                </div>
+
+                <!-- PESTAÑAS PRINCIPALES -->
+                <ul class="nav nav-tabs mb-4" id="planillaTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" onclick="openTab(event, 'semana-tab')">
+                            <i class="bi bi-calendar-week me-1"></i> Semana Actual
                         </button>
+                    </li>
+
+                    <li class="nav-item">
+                        <button class="nav-link" onclick="openTab(event, 'observaciones-tab')">
+                            <i class="bi bi-chat-dots me-1"></i> Observaciones
+                        </button>
+                    </li>
+                </ul>
+
+                <!-- CONTENIDO DE PESTAÑA 1: SEMANA ACTUAL -->
+                <div id="semana-tab" class="tab-pane active">
+                    <h5 class="mb-3 text-h">Empleados de esta semana</h5>
+
+                    <form id="formHoras" th:action="@{/control-planilla/guardar}" method="post">
+                        <input type="hidden" name="semanaId" th:value="${semana.id}"/>
+                        <input type="hidden" name="scrollToBottom" value="true"/>
+
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover table-excel">
+                                <thead class="table-dark">
+                                <tr>
+                                    <th rowspan="2">Empleado</th>
+                                    <th colspan="2" class="separador">Horas 50%</th>
+                                    <th colspan="2">Horas 100%</th>
+                                    <th colspan="2">Guardias</th>
+                                </tr>
+                                <tr>
+                                    <th class="separador">Semana</th>
+                                    <th class="mensual">Total Mensual</th>
+                                    <th>Semana</th>
+                                    <th class="mensual">Total Mensual</th>
+                                    <th>Semana</th>
+                                    <th class="mensual">Total Mensual</th>
+                                </tr>
+                                </thead>
+
+                                <tbody id="empleadosTableBody">
+                                <tr th:each="se, i : ${empleadosSemana}">
+                                    <td th:text="${se.empleado.apellido + ', ' + se.empleado.nombre}"></td>
+
+                                    <input type="hidden"
+                                           th:name="'items[' + ${i.index} + '].id'"
+                                           th:value="${se.id}"/>
+
+                                    <td class="separador">
+                                        <input type="number"
+                                               class="form-control form-control-sm"
+                                               th:name="'items[' + ${i.index} + '].totalHorasExtra'"
+                                               th:value="${se.totalHorasExtra}"
+                                               min="0"
+                                               step="0.5"/>
+                                    </td>
+
+                                    <td class="mensual"
+                                        th:text="${totalesMensualesPorEmpleado[se.empleado.id]?.totalHorasExtra != null ?
+                                                      #numbers.formatDecimal(totalesMensualesPorEmpleado[se.empleado.id].totalHorasExtra, 1, 2) : '0.00'}">
+                                    </td>
+
+                                    <td>
+                                        <input type="number"
+                                               class="form-control form-control-sm"
+                                               th:name="'items[' + ${i.index} + '].totalFindeFeriado'"
+                                               th:value="${se.totalFindeFeriado}"
+                                               min="0"
+                                               step="0.5"/>
+                                    </td>
+
+                                    <td class="mensual"
+                                        th:text="${totalesMensualesPorEmpleado[se.empleado.id]?.totalFindeFeriado != null ?
+                                                      #numbers.formatDecimal(totalesMensualesPorEmpleado[se.empleado.id].totalFindeFeriado, 1, 2) : '0.00'}">
+                                    </td>
+
+                                    <td>
+                                        <input type="number"
+                                               class="form-control form-control-sm"
+                                               th:name="'items[' + ${i.index} + '].totalGuardias'"
+                                               th:value="${se.totalGuardias}"
+                                               min="0"/>
+                                    </td>
+
+                                    <td class="mensual"
+                                        th:text="${totalesMensualesPorEmpleado[se.empleado.id]?.totalGuardias != null ?
+                                                      totalesMensualesPorEmpleado[se.empleado.id].totalGuardias : 0}">
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="mt-3">
+                            <button type="submit" class="btn-action">
+                                <i class="bi bi-save me-1"></i> Guardar cambios
+                            </button>
+                        </div>
+                    </form>
+
+                    <hr class="my-4">
+
+                    <!-- Formulario para agregar empleado con búsqueda dinámica -->
+                    <h5 id="agregarEmpleado" class="mb-3 text-h">Agregar empleado a la semana</h5>
+                    <form id="formAgregarEmpleado"
+                          th:action="@{/semana-empleado/agregar-con-guardado}"
+                          method="post"
+                          class="row g-3 align-items-center">
+
+                        <!-- 🔴 IMPORTANTE: Agregar token CSRF aquí -->
+                        <input type="hidden"
+                               th:name="${_csrf.parameterName}"
+                               th:value="${_csrf.token}" />
+
+                        <!-- Agregar TODOS los campos ocultos de los items del formulario de horas -->
+                        <div th:each="se, i : ${empleadosSemana}" style="display: none;">
+                            <input type="hidden"
+                                   th:name="'items[' + ${i.index} + '].id'"
+                                   th:value="${se.id}"/>
+                            <input type="hidden"
+                                   th:name="'items[' + ${i.index} + '].totalHorasExtra'"
+                                   th:value="${se.totalHorasExtra}"/>
+                            <input type="hidden"
+                                   th:name="'items[' + ${i.index} + '].totalFindeFeriado'"
+                                   th:value="${se.totalFindeFeriado}"/>
+                            <input type="hidden"
+                                   th:name="'items[' + ${i.index} + '].totalGuardias'"
+                                   th:value="${se.totalGuardias}"/>
+                        </div>
+
+                        <!-- Campos normales del formulario -->
+                        <input type="hidden" name="semanaId" th:value="${semana.id}">
+                        <input type="hidden" name="controlPlanillaId" th:value="${control.id}">
+                        <input type="hidden" name="scrollToBottom" value="true"/>
+                        <input type="hidden" id="empleadoId" name="empleadoId" value="">
+
+                        <div class="col-md-8">
+                            <div class="position-relative">
+                                <input type="text"
+                                       id="empleado"
+                                       class="form-control"
+                                       placeholder="Buscar empleado por nombre o apellido..."
+                                       autocomplete="off"
+                                       required>
+
+                                <!-- Contenedor de sugerencias -->
+                                <div id="sugerencias"
+                                     class="list-group position-absolute w-100 z-3"
+                                     style="top: 100%; max-height: 300px; overflow-y: auto; display: none; z-index: 1000;">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-auto">
+                            <button type="submit" class="btn-action">
+                                <i class="bi bi-person-plus me-1"></i> Agregar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- CONTENIDO DE PESTAÑA 2: OBSERVACIONES -->
+                <div id="observaciones-tab" class="tab-pane">
+                    <h5 class="mb-3 text-h">Observaciones del Período</h5>
+
+                    <div class="info-box mb-4">
+                        <ul class="mb-0">
+                            <li><strong>Período:</strong>
+                                <span th:text="${#temporals.format(control.desde, 'dd/MM/yyyy')}"></span>
+                                →
+                                <span th:text="${#temporals.format(control.hasta, 'dd/MM/yyyy')}"></span>
+                            </li>
+                        </ul>
                     </div>
-                </form>
+
+                    <!-- Formulario para editar observaciones -->
+                    <form th:action="@{/control-planilla/{id}/observaciones(id=${control.id})}" method="post">
+                        <input type="hidden" name="semanaId" th:value="${semana.id}">
+                        <input type="hidden" name="scrollToBottom" value="true"/>
+
+                        <div class="mb-3">
+                            <label for="observaciones" class="form-label fw-bold">Observaciones:</label>
+                            <textarea id="observaciones"
+                                      name="observaciones"
+                                      class="form-control"
+                                      rows="8"
+                                      placeholder="Escribe aquí las observaciones para este control de planilla..."
+                                      th:text="${control.observaciones}"></textarea>
+                        </div>
+
+                        <div class="mt-3">
+                            <button type="submit" class="btn-action">
+                                <i class="bi bi-save me-1"></i> Guardar observaciones
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
             </div>
-
         </div>
-    </div>
-</main>
+    </main>
 
-<!-- JavaScript para las pestañas principales -->
-<script>
-    function openTab(evt, tabName) {
-        // Ocultar todo el contenido de pestañas principales
-        var tabContents = document.getElementsByClassName("tab-pane");
-        for (var i = 0; i < tabContents.length; i++) {
-            tabContents[i].classList.remove("active");
+    <!-- JavaScript para las pestañas principales -->
+    <script>
+        function openTab(evt, tabName) {
+            var tabContents = document.getElementsByClassName("tab-pane");
+            for (var i = 0; i < tabContents.length; i++) {
+                tabContents[i].classList.remove("active");
+            }
+
+            var tabButtons = document.querySelectorAll("#planillaTabs .nav-link");
+            for (var i = 0; i < tabButtons.length; i++) {
+                tabButtons[i].classList.remove("active");
+            }
+
+            document.getElementById(tabName).classList.add("active");
+            evt.currentTarget.classList.add("active");
         }
+    </script>
 
-        // Quitar la clase active de todos los botones de pestañas principales
-        var tabButtons = document.querySelectorAll("#planillaTabs .nav-link");
-        for (var i = 0; i < tabButtons.length; i++) {
-            tabButtons[i].classList.remove("active");
-        }
+    <!-- Script ÚNICO para sincronizar valores y enviar el formulario combinado -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const formAgregar = document.getElementById('formAgregarEmpleado');
+            const inputEmpleadoId = document.getElementById('empleadoId');
+            const inputEmpleado = document.getElementById('empleado');
 
-        // Mostrar la pestaña actual y marcar el botón como activo
-        document.getElementById(tabName).classList.add("active");
-        evt.currentTarget.classList.add("active");
-    }
-</script>
-
-<!-- Script para guardar cambios antes de agregar empleado (VERSIÓN DESPLEGADA) -->
-<script>
-    document.addEventListener("DOMContentLoaded", function() {
-        const formAgregarEmpleado = document.getElementById('formAgregarEmpleado');
-        const formHoras = document.getElementById('formHoras');
-        const inputEmpleado = document.getElementById('empleado');
-        const inputEmpleadoId = document.getElementById('empleadoId');
-        let procesando = false;
-
-        // Obtener el token CSRF del meta tag (si existe)
-        function getCsrfToken() {
-            const token = document.querySelector('meta[name="_csrf"]')?.content;
-            const header = document.querySelector('meta[name="_csrf_header"]')?.content;
-            return { token, header };
-        }
-
-        if (formAgregarEmpleado && formHoras) {
-            formAgregarEmpleado.addEventListener('submit', function(e) {
-                // Validar empleado seleccionado
-                if (!inputEmpleadoId.value) {
-                    e.preventDefault();
-                    alert('Por favor, selecciona un empleado de la lista de sugerencias');
-                    inputEmpleado.focus();
-                    return;
-                }
-
-                // Evitar múltiples envíos
-                if (procesando) {
-                    e.preventDefault();
-                    return;
-                }
-
-                e.preventDefault();
-                procesando = true;
-
-                // Deshabilitar botón
-                const submitBtn = formAgregarEmpleado.querySelector('button[type="submit"]');
-                submitBtn.disabled = true;
-                submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i> Procesando...';
-
-                // Guardar datos del empleado para después
-                const empleadoData = {
-                    id: inputEmpleadoId.value,
-                    nombre: inputEmpleado.value,
-                    semanaId: document.querySelector('[name="semanaId"]').value,
-                    controlPlanillaId: document.querySelector('[name="controlPlanillaId"]').value
-                };
-                sessionStorage.setItem('empleadoPendiente', JSON.stringify(empleadoData));
-
-                // Enviar el formulario de horas de manera tradicional (submit normal)
-                // Esto evita el problema de límite de archivos
-                formHoras.submit();
-            });
-        }
-
-        // Verificar si hay un empleado pendiente después de guardar
-        const empleadoPendiente = sessionStorage.getItem('empleadoPendiente');
-        if (empleadoPendiente) {
-            try {
-                const empleado = JSON.parse(empleadoPendiente);
-
-                // Verificar que estamos en la misma semana
-                const semanaIdActual = document.querySelector('[name="semanaId"]')?.value;
-
-                if (semanaIdActual === empleado.semanaId) {
-                    console.log('Empleado pendiente encontrado, agregando automáticamente...');
-
-                    // Limpiar el storage
-                    sessionStorage.removeItem('empleadoPendiente');
-
-                    // Auto-completar y enviar el formulario de agregar
-                    document.getElementById('empleadoId').value = empleado.id;
-                    document.getElementById('empleado').value = empleado.nombre;
-
-                    // Agregar el token CSRF al formulario si existe
-                    const csrf = getCsrfToken();
-                    if (csrf.token && csrf.header) {
-                        // Buscar o crear el input CSRF
-                        let csrfInput = document.querySelector('input[name="' + csrf.header + '"]');
-                        if (!csrfInput) {
-                            csrfInput = document.createElement('input');
-                            csrfInput.type = 'hidden';
-                            csrfInput.name = csrf.header;
-                            formAgregarEmpleado.appendChild(csrfInput);
-                        }
-                        csrfInput.value = csrf.token;
+            if (formAgregar) {
+                formAgregar.addEventListener('submit', function(e) {
+                    // Validar empleado seleccionado
+                    if (!inputEmpleadoId.value) {
+                        e.preventDefault();
+                        alert("Por favor, selecciona un empleado de la lista de sugerencias");
+                        inputEmpleado.focus();
+                        return false;
                     }
 
-                    // Enviar el formulario de agregar empleado
-                    setTimeout(() => {
-                        formAgregarEmpleado.submit();
-                    }, 500);
-                } else {
-                    sessionStorage.removeItem('empleadoPendiente');
-                }
-            } catch (e) {
-                console.error('Error:', e);
-                sessionStorage.removeItem('empleadoPendiente');
-            }
-        }
-    });
-</script>
+                    // Mostrar indicador de carga
+                    const submitBtn = formAgregar.querySelector('button[type="submit"]');
+                    submitBtn.disabled = true;
+                    submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i> Procesando...';
 
-<!-- Script para búsqueda dinámica de empleados (MODIFICADO) -->
-<script>
-    document.addEventListener("DOMContentLoaded", function () {
-        const inputEmpleado = document.getElementById("empleado");
-        const inputEmpleadoId = document.getElementById("empleadoId");
-        const sugerencias = document.getElementById("sugerencias");
+                    // Sincronizar los valores actualizados de los inputs con los campos ocultos
+                    const filas = document.querySelectorAll('#empleadosTableBody tr');
+                    const itemsDivs = formAgregar.querySelectorAll('div[style="display: none;"]');
 
-        if (!inputEmpleado || !inputEmpleadoId || !sugerencias) return;
+                    filas.forEach((fila, index) => {
+                        if (itemsDivs[index]) {
+                            const inputsFila = fila.querySelectorAll('input[type="number"]');
+                            const hiddenInputs = itemsDivs[index].querySelectorAll('input[type="hidden"]');
 
-        inputEmpleado.addEventListener("input", function () {
-            const query = this.value.trim();
-
-            if (query.length < 2) {
-                sugerencias.innerHTML = "";
-                sugerencias.style.display = "none";
-                return;
-            }
-
-            // Obtener token CSRF para la petición fetch
-            const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;
-            const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content;
-
-            const headers = {
-                'Content-Type': 'application/json'
-            };
-
-            if (csrfToken && csrfHeader) {
-                headers[csrfHeader] = csrfToken;
-            }
-
-            fetch(`/empleados/buscar?q=${encodeURIComponent(query)}`, {
-                headers: headers
-            })
-            .then(response => response.json())
-            .then(data => {
-                sugerencias.innerHTML = "";
-
-                if (data.length > 0) {
-                    data.forEach(e => {
-                        const item = document.createElement("a");
-                        item.href = "#";
-                        item.className = "list-group-item list-group-item-action";
-                        item.dataset.id = e.id;
-                        item.dataset.dni = e.dni;
-                        item.dataset.nombre = e.nombre;
-                        item.dataset.apellido = e.apellido;
-                        item.textContent = `${e.apellido} ${e.nombre} - ${e.dni}`;
-
-                        item.addEventListener("click", function (event) {
-                            event.preventDefault();
-                            inputEmpleado.value = `${this.dataset.apellido} ${this.dataset.nombre}`;
-                            inputEmpleadoId.value = this.dataset.id;
-                            sugerencias.innerHTML = "";
-                            sugerencias.style.display = "none";
-                        });
-
-                        sugerencias.appendChild(item);
+                            if (inputsFila.length >= 3 && hiddenInputs.length >= 4) {
+                                // Actualizar cada tipo de hora
+                                if (inputsFila[0]) hiddenInputs[1].value = inputsFila[0].value; // totalHorasExtra
+                                if (inputsFila[1]) hiddenInputs[2].value = inputsFila[1].value; // totalFindeFeriado
+                                if (inputsFila[2]) hiddenInputs[3].value = inputsFila[2].value; // totalGuardias
+                            }
+                        }
                     });
-                    sugerencias.style.display = "block";
-                } else {
+
+                    console.log('Valores sincronizados, enviando formulario combinado...');
+
+                    // El formulario se envía normalmente (UNA SOLA VEZ)
+                    return true;
+                });
+            }
+        });
+    </script>
+
+    <!-- Script para búsqueda dinámica de empleados -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const inputEmpleado = document.getElementById("empleado");
+            const inputEmpleadoId = document.getElementById("empleadoId");
+            const sugerencias = document.getElementById("sugerencias");
+
+            if (!inputEmpleado || !inputEmpleadoId || !sugerencias) return;
+
+            inputEmpleado.addEventListener("input", function () {
+                const query = this.value.trim();
+
+                if (query.length < 2) {
+                    sugerencias.innerHTML = "";
+                    sugerencias.style.display = "none";
+                    return;
+                }
+
+                // Obtener token CSRF para la petición fetch
+                const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;
+                const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content;
+
+                const headers = {
+                    'Content-Type': 'application/json'
+                };
+
+                if (csrfToken && csrfHeader) {
+                    headers[csrfHeader] = csrfToken;
+                }
+
+                fetch(`/empleados/buscar?q=${encodeURIComponent(query)}`, {
+                    headers: headers
+                })
+                .then(response => response.json())
+                .then(data => {
+                    sugerencias.innerHTML = "";
+
+                    if (data.length > 0) {
+                        data.forEach(e => {
+                            const item = document.createElement("a");
+                            item.href = "#";
+                            item.className = "list-group-item list-group-item-action";
+                            item.dataset.id = e.id;
+                            item.dataset.dni = e.dni;
+                            item.dataset.nombre = e.nombre;
+                            item.dataset.apellido = e.apellido;
+                            item.textContent = `${e.apellido} ${e.nombre} - ${e.dni}`;
+
+                            item.addEventListener("click", function (event) {
+                                event.preventDefault();
+                                inputEmpleado.value = `${this.dataset.apellido} ${this.dataset.nombre}`;
+                                inputEmpleadoId.value = this.dataset.id;
+                                sugerencias.innerHTML = "";
+                                sugerencias.style.display = "none";
+                            });
+
+                            sugerencias.appendChild(item);
+                        });
+                        sugerencias.style.display = "block";
+                    } else {
+                        sugerencias.style.display = "none";
+                    }
+                })
+                .catch(error => {
+                    console.error("Error al buscar empleados:", error);
+                    sugerencias.innerHTML = "";
+                    sugerencias.style.display = "none";
+                });
+            });
+
+            // Ocultar sugerencias al hacer clic fuera
+            document.addEventListener("click", function (event) {
+                if (!sugerencias.contains(event.target) && event.target !== inputEmpleado) {
+                    sugerencias.innerHTML = "";
                     sugerencias.style.display = "none";
                 }
-            })
-            .catch(error => {
-                console.error("Error al buscar empleados:", error);
-                sugerencias.innerHTML = "";
-                sugerencias.style.display = "none";
+            });
+
+            // Ocultar sugerencias con ESC
+            inputEmpleado.addEventListener("keydown", function (event) {
+                if (event.key === "Escape") {
+                    sugerencias.innerHTML = "";
+                    sugerencias.style.display = "none";
+                }
+            });
+
+            // Limpiar ID si el usuario modifica el input
+            inputEmpleado.addEventListener("keyup", function() {
+                inputEmpleadoId.value = "";
             });
         });
+    </script>
 
-        // Resto del código igual...
-    });
-</script>
-
-<!-- Script para scroll automático -->
-<script>
-    (function() {
-        // Función para hacer scroll al final de la página
-        function scrollToBottom() {
-            console.log("Intentando hacer scroll..."); // Para debug
-
-            // Intentar varias veces con pequeños retrasos para asegurar que el DOM esté listo
-            setTimeout(function() {
-                window.scrollTo({
-                    top: document.body.scrollHeight,
-                    behavior: 'smooth'
-                });
-                console.log("Scroll ejecutado"); // Para debug
-            }, 300);
-
-            // Segundo intento por si acaso
-            setTimeout(function() {
-                window.scrollTo({
-                    top: document.body.scrollHeight,
-                    behavior: 'smooth'
-                });
-            }, 600);
-        }
-
-        // Función para verificar y procesar parámetros de URL
-        function checkUrlForScroll() {
-            console.log("Verificando URL para scroll..."); // Para debug
-            console.log("URL actual:", window.location.href); // Para debug
-
-            // Obtener parámetros de la URL
-            const urlParams = new URLSearchParams(window.location.search);
-            const scrollToBottom = urlParams.get('scrollToBottom');
-
-            console.log("scrollToBottom param:", scrollToBottom); // Para debug
-
-            // Scroll por parámetro scrollToBottom
-            if (scrollToBottom === 'true') {
-                console.log("¡ScrollToBottom detectado! Ejecutando scroll..."); // Para debug
-                scrollToBottom();
-
-                // Limpiar el parámetro de la URL sin recargar la página
-                const url = new URL(window.location.href);
-                url.searchParams.delete('scrollToBottom');
-                window.history.replaceState({}, document.title, url.toString());
-            }
-        }
-
-        // Ejecutar cuando el DOM esté completamente cargado
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', checkUrlForScroll);
-        } else {
-            // DOM ya está cargado
-            checkUrlForScroll();
-        }
-
-        // También ejecutar después de que todo esté cargado (imágenes, etc)
-        window.addEventListener('load', function() {
-            // Verificar de nuevo por si acaso
-            const urlParams = new URLSearchParams(window.location.search);
-            if (urlParams.get('scrollToBottom') === 'true') {
-                console.log("Load event: scrollToBottom detectado"); // Para debug
-                scrollToBottom();
-            }
-        });
-
-        // Scroll por hash (para #agregarEmpleado)
-        if (window.location.hash === '#agregarEmpleado') {
-            setTimeout(function() {
-                const elemento = document.getElementById('agregarEmpleado');
-                if (elemento) {
-                    elemento.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'start'
+    <!-- Script para scroll automático -->
+    <script>
+        (function() {
+            function scrollToBottom() {
+                setTimeout(function() {
+                    window.scrollTo({
+                        top: document.body.scrollHeight,
+                        behavior: 'smooth'
                     });
+                }, 300);
+            }
+
+            function checkUrlForScroll() {
+                const urlParams = new URLSearchParams(window.location.search);
+                const scrollToBottom = urlParams.get('scrollToBottom');
+
+                if (scrollToBottom === 'true') {
+                    scrollToBottom();
+                    const url = new URL(window.location.href);
+                    url.searchParams.delete('scrollToBottom');
+                    window.history.replaceState({}, document.title, url.toString());
                 }
-            }, 300);
+            }
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', checkUrlForScroll);
+            } else {
+                checkUrlForScroll();
+            }
+
+            window.addEventListener('load', function() {
+                const urlParams = new URLSearchParams(window.location.search);
+                if (urlParams.get('scrollToBottom') === 'true') {
+                    scrollToBottom();
+                }
+            });
+
+            if (window.location.hash === '#agregarEmpleado') {
+                setTimeout(function() {
+                    const elemento = document.getElementById('agregarEmpleado');
+                    if (elemento) {
+                        elemento.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'start'
+                        });
+                    }
+                }, 300);
+            }
+
+            setTimeout(function() {
+                const filas = document.querySelectorAll('#empleadosTableBody tr');
+                if (filas.length > 0) {
+                    const ultimaFila = filas[filas.length - 1];
+                    ultimaFila.style.backgroundColor = '#d4edda';
+                    ultimaFila.style.transition = 'background-color 2s';
+                    setTimeout(() => {
+                        ultimaFila.style.backgroundColor = '';
+                    }, 2000);
+                }
+            }, 500);
+        })();
+    </script>
+
+    <!-- Estilos adicionales -->
+    <style>
+        .separador {
+            border-left: 2px solid #dee2e6 !important;
+        }
+        .mensual {
+            background-color: #e8f4f8;
+            font-weight: bold;
+        }
+        .table-excel th, .table-excel td {
+            vertical-align: middle;
+        }
+        .tab-pane {
+            display: none;
+        }
+        .tab-pane.active {
+            display: block;
         }
 
-        // Resaltar el último empleado (opcional, para mejor UX)
-        setTimeout(function() {
-            const filas = document.querySelectorAll('#empleadosTableBody tr');
-            if (filas.length > 0) {
-                const ultimaFila = filas[filas.length - 1];
-                ultimaFila.style.backgroundColor = '#d4edda';
-                ultimaFila.style.transition = 'background-color 2s';
-                setTimeout(() => {
-                    ultimaFila.style.backgroundColor = '';
-                }, 2000);
-            }
-        }, 500);
-    })();
-</script>
+        .nav-tabs .nav-link {
+            cursor: pointer;
+            color: #495057;
+            border: 1px solid transparent;
+            border-top-left-radius: 0.25rem;
+            border-top-right-radius: 0.25rem;
+            background: transparent;
+        }
 
-<!-- Estilos adicionales -->
-<style>
-    .separador {
-        border-left: 2px solid #dee2e6 !important;
-    }
-    .mensual {
-        background-color: #e8f4f8;
-        font-weight: bold;
-    }
-    .table-excel th, .table-excel td {
-        vertical-align: middle;
-    }
-    .tab-pane {
-        display: none;
-    }
-    .tab-pane.active {
-        display: block;
-    }
+        .nav-tabs .nav-link.active {
+            color: #28a745 !important;
+            border-color: #28a745 #28a745 #fff !important;
+            background: transparent !important;
+        }
 
-    /* Estilo para pestañas */
-    .nav-tabs .nav-link {
-        cursor: pointer;
-        color: #495057;
-        border: 1px solid transparent;
-        border-top-left-radius: 0.25rem;
-        border-top-right-radius: 0.25rem;
-        background: transparent;
-    }
+        .nav-tabs .nav-link:hover:not(.active) {
+            border-color: #e9ecef #e9ecef #dee2e6;
+            isolation: isolate;
+        }
 
-    .nav-tabs .nav-link.active {
-        color: #28a745 !important;
-        border-color: #28a745 #28a745 #fff !important;
-        background: transparent !important;
-    }
+        .list-group-item {
+            cursor: pointer;
+        }
+        .list-group-item:hover {
+            background-color: #f8f9fa;
+        }
 
-    .nav-tabs .nav-link:hover:not(.active) {
-        border-color: #e9ecef #e9ecef #dee2e6;
-        isolation: isolate;
-    }
+        #empleadosTableBody tr:last-child {
+            transition: background-color 2s;
+        }
+    </style>
 
-    .list-group-item {
-        cursor: pointer;
-    }
-    .list-group-item:hover {
-        background-color: #f8f9fa;
-    }
-
-    /* Animación para resaltar fila */
-    #empleadosTableBody tr:last-child {
-        transition: background-color 2s;
-    }
-
-    @keyframes highlight {
-        0% { background-color: #d4edda; }
-        100% { background-color: transparent; }
-    }
-</style>
-
-<div th:replace="fragments/footer :: footer"></div>
-</body>
-</html>
+    <div th:replace="fragments/footer :: footer"></div>
+    </body>
+    </html>
